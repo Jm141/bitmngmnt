@@ -1073,7 +1073,7 @@
                     <i class="fas fa-house nav-icon"></i>
                     Dashboard
                 </a>
-                <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="{% url 'inventory:inventory_dashboard' %}">
+                <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/" onclick="console.log('Inventory link clicked:', this.href);">
                     <i class="fas fa-box nav-icon"></i>
                     Inventory
                 </a>
@@ -1247,10 +1247,31 @@
                 });
 
                 // Close dropdown when clicking outside
-                document.addEventListener('click', function() {
-                    userDropdown.style.display = 'none';
+                document.addEventListener('click', function(e) {
+                    // Don't close dropdown if clicking on navigation items
+                    if (!e.target.closest('.nav-item') && !e.target.closest('#userDropdown')) {
+                        userDropdown.style.display = 'none';
+                    }
                 });
             }
+
+            // Debug navigation clicks
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(function(navItem) {
+                navItem.addEventListener('click', function(e) {
+                    console.log('Navigation clicked:', this.href, this.textContent.trim());
+                    
+                    // Special handling for inventory dashboard
+                    if (this.href.includes('inventory_dashboard')) {
+                        console.log('Inventory dashboard link clicked!');
+                        // Ensure the link works properly
+                        if (this.href.endsWith('#')) {
+                            e.preventDefault();
+                            window.location.href = '/inventory/';
+                        }
+                    }
+                });
+            });
 
         // Auto-hide alerts after 5 seconds
         setTimeout(function() {

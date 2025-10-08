@@ -30,6 +30,9 @@ urlpatterns = [
     # Admin Attendance Overview
     path('attendance-overview/', views.admin_attendance_overview, name='admin_attendance_overview'),
     
+    # Debug URL
+    path('nav-debug/', views.nav_debug, name='nav_debug'),
+    
     # Inventory Management URLs
     path('inventory/', views.inventory_dashboard, name='inventory_dashboard'),
     

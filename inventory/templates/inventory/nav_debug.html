@@ -1,0 +1,87 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Navigation Debug{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1>Navigation Debug Test</h1>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5>Test Navigation Links</h5>
+                </div>
+                <div class="card-body">
+                    <p>Click these links to test navigation:</p>
+                    
+                    <div class="mb-3">
+                        <a href="{% url 'inventory:dashboard' %}" class="btn btn-primary">Dashboard</a>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-success">Inventory Dashboard</a>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <a href="{% url 'inventory:item_list' %}" class="btn btn-info">Items List</a>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <a href="{% url 'inventory:supplier_list' %}" class="btn btn-warning">Suppliers</a>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <a href="{% url 'inventory:recipe_list' %}" class="btn btn-secondary">Recipes</a>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6>Current URL Info:</h6>
+                    <p><strong>URL Name:</strong> {{ request.resolver_match.url_name }}</p>
+                    <p><strong>URL Path:</strong> {{ request.path }}</p>
+                    <p><strong>User Role:</strong> {{ user.role }}</p>
+                    <p><strong>User Permissions:</strong> 
+                        {% if user.role == 'admin' or user.role == 'super_admin' %}
+                            Full Access
+                        {% else %}
+                            Limited Access
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Debug script to test navigation
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Navigation Debug Page Loaded');
+    
+    // Test if navigation links are clickable
+    const navLinks = document.querySelectorAll('.nav-item');
+    console.log('Found navigation links:', navLinks.length);
+    
+    navLinks.forEach((link, index) => {
+        console.log(`Link ${index}:`, link.href, link.textContent.trim());
+        
+        link.addEventListener('click', function(e) {
+            console.log('Navigation clicked:', this.href, this.textContent.trim());
+        });
+    });
+    
+    // Test inventory dashboard link specifically
+    const inventoryLink = document.querySelector('a[href*="inventory_dashboard"]');
+    if (inventoryLink) {
+        console.log('Inventory dashboard link found:', inventoryLink.href);
+        inventoryLink.addEventListener('click', function(e) {
+            console.log('Inventory dashboard link clicked!');
+        });
+    } else {
+        console.log('Inventory dashboard link NOT found!');
+    }
+});
+</script>
+{% endblock %}

@@ -1,30 +1,30 @@
 {% extends 'inventory/base.html' %}
 {% load static %}
 
-{% block title %}Inventory Dashboard{% endblock %}
+{% block title %}Bakery Inventory Dashboard{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">Inventory Dashboard</h1>
+                <h1 class="h3 mb-0">🍞 Bakery Inventory Dashboard</h1>
                 <div class="btn-group" role="group">
                     <a href="{% url 'inventory:stock_receive' %}" class="btn btn-success">
-                        <i class="fas fa-plus"></i> Receive Stock
+                        <i class="fas fa-plus"></i> Receive Ingredients
                     </a>
                     <a href="{% url 'inventory:stock_consume' %}" class="btn btn-warning">
-                        <i class="fas fa-minus"></i> Consume Stock
+                        <i class="fas fa-minus"></i> Use Ingredients
                     </a>
                     <a href="{% url 'inventory:production_create' %}" class="btn btn-primary">
-                        <i class="fas fa-industry"></i> Production
+                        <i class="fas fa-industry"></i> Bake Products
                     </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- KPI Cards -->
+    <!-- Bakery KPI Cards -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
@@ -32,14 +32,17 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Total Items
+                                🥖 Total Ingredients
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ stock_summary.total_items }}
+                                {{ bakery_analytics.total_ingredients }}
+                            </div>
+                            <div class="text-xs text-muted">
+                                {{ bakery_analytics.total_finished_goods }} finished products
                             </div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                            <i class="fas fa-seedling fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -52,10 +55,13 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Low Stock Items
+                                ⚠️ Low Stock Alert
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 {{ stock_summary.low_stock_count }}
+                            </div>
+                            <div class="text-xs text-muted">
+                                Need immediate attention
                             </div>
                         </div>
                         <div class="col-auto">
@@ -72,10 +78,13 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Expiring Soon
+                                📅 Expiring Soon
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 {{ stock_summary.expiring_count }}
+                            </div>
+                            <div class="text-xs text-muted">
+                                Next 7 days
                             </div>
                         </div>
                         <div class="col-auto">
@@ -87,19 +96,22 @@
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                Expired Items
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                🍰 Active Recipes
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ stock_summary.expired_count }}
+                                {{ bakery_analytics.total_recipes }}
+                            </div>
+                            <div class="text-xs text-muted">
+                                {{ bakery_analytics.active_suppliers }} suppliers
                             </div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-times-circle fa-2x text-gray-300"></i>
+                            <i class="fas fa-book fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -194,12 +206,151 @@
         </div>
     </div>
 
-    <!-- Recent Movements -->
+    <!-- Bakery Analytics Charts -->
+    <div class="row mb-4">
+        <!-- Daily Activity Trend -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">📈 Daily Bakery Activity (Last 7 Days)</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="dailyActivityChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Consumed Ingredients -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">🥖 Top Used Ingredients (30 Days)</h6>
+                </div>
+                <div class="card-body">
+                    {% if top_consumed_items %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Ingredient</th>
+                                        <th>Qty Used</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_consumed_items %}
+                                    <tr>
+                                        <td>
+                                            <small>{{ item.item__code }}</small><br>
+                                            {{ item.item__name }}
+                                        </td>
+                                        <td class="text-success font-weight-bold">
+                                            {{ item.total_qty }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No consumption data available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expiry Trend Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">📅 Expiry Trend (Next 30 Days)</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="expiryTrendChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Statistics -->
+    <div class="row mb-4">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">🏭 Production Stats (30 Days)</h6>
+                </div>
+                <div class="card-body text-center">
+                    <div class="row">
+                        <div class="col-4">
+                            <div class="text-primary">
+                                <i class="fas fa-industry fa-2x"></i>
+                                <div class="h4">{{ production_stats.total_productions }}</div>
+                                <small>Productions</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-warning">
+                                <i class="fas fa-minus fa-2x"></i>
+                                <div class="h4">{{ production_stats.total_consumption }}</div>
+                                <small>Consumptions</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-success">
+                                <i class="fas fa-plus fa-2x"></i>
+                                <div class="h4">{{ production_stats.total_receipts }}</div>
+                                <small>Receipts</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Distribution -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">📊 Inventory Categories</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for category in category_distribution %}
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                {% if category.category == 'ingredient' %}
+                                    <i class="fas fa-seedling fa-2x text-success"></i>
+                                    <div class="h5 text-success">{{ category.count }}</div>
+                                    <small class="text-muted">Ingredients</small>
+                                {% elif category.category == 'finished_good' %}
+                                    <i class="fas fa-bread-slice fa-2x text-primary"></i>
+                                    <div class="h5 text-primary">{{ category.count }}</div>
+                                    <small class="text-muted">Finished Goods</small>
+                                {% elif category.category == 'packaging' %}
+                                    <i class="fas fa-box fa-2x text-info"></i>
+                                    <div class="h5 text-info">{{ category.count }}</div>
+                                    <small class="text-muted">Packaging</small>
+                                {% else %}
+                                    <i class="fas fa-tools fa-2x text-warning"></i>
+                                    <div class="h5 text-warning">{{ category.count }}</div>
+                                    <small class="text-muted">Equipment</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Bakery Activities -->
     <div class="row">
         <div class="col-12">
             <div class="card shadow">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Stock Movements</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">🔄 Recent Bakery Activities</h6>
                     <a href="{% url 'inventory:item_list' %}" class="btn btn-sm btn-primary">View All Items</a>
                 </div>
                 <div class="card-body">
@@ -248,19 +399,19 @@
         </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Bakery Quick Actions -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">🍞 Bakery Quick Actions</h6>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <a href="{% url 'inventory:item_create' %}" class="btn btn-outline-primary btn-block">
-                                <i class="fas fa-plus"></i><br>
-                                Add New Item
+                                <i class="fas fa-seedling"></i><br>
+                                Add Ingredient
                             </a>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -287,4 +438,96 @@
         </div>
     </div>
 </div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Daily Activity Chart
+const dailyActivityCtx = document.getElementById('dailyActivityChart').getContext('2d');
+const dailyActivityChart = new Chart(dailyActivityCtx, {
+    type: 'line',
+    data: {
+        labels: {{ date_labels|safe }},
+        datasets: [{
+            label: 'Production',
+            data: {{ daily_production|safe }},
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1,
+            fill: false
+        }, {
+            label: 'Consumption',
+            data: {{ daily_consumption|safe }},
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.1,
+            fill: false
+        }, {
+            label: 'Receipts',
+            data: {{ daily_receipts|safe }},
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            tension: 0.1,
+            fill: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            title: {
+                display: true,
+                text: 'Daily Bakery Operations'
+            },
+            legend: {
+                position: 'top',
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+// Expiry Trend Chart
+const expiryTrendCtx = document.getElementById('expiryTrendChart').getContext('2d');
+const expiryTrendChart = new Chart(expiryTrendCtx, {
+    type: 'line',
+    data: {
+        labels: {{ expiry_labels|safe }},
+        datasets: [{
+            label: 'Items Expiring',
+            data: {{ expiry_trend|safe }},
+            borderColor: 'rgb(255, 159, 64)',
+            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+            tension: 0.1,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            title: {
+                display: true,
+                text: 'Items Expiring in Next 30 Days'
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+</script>
 {% endblock %}

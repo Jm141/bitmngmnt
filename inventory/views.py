@@ -583,14 +583,28 @@ def admin_attendance_overview(request):
     return render(request, 'inventory/admin_attendance_overview.html', context)
 
 
+# --- DEBUG VIEWS ---
+
+@login_required
+def nav_debug(request):
+    """
+    Debug view to test navigation
+    """
+    return render(request, 'inventory/nav_debug.html')
+
 # --- INVENTORY MANAGEMENT VIEWS ---
 
 @login_required
 @permission_required('inventory_read')
 def inventory_dashboard(request):
     """
-    Inventory dashboard with KPIs and alerts
+    Bakery inventory dashboard with KPIs, analytics, and line graphs
     """
+    from django.db.models import Sum, Count, Avg
+    from django.utils import timezone
+    from datetime import timedelta, datetime
+    import json
+    
     # Get stock summary
     stock_summary = InventoryService.get_stock_summary()
     
@@ -606,12 +620,105 @@ def inventory_dashboard(request):
     # Recent movements
     recent_movements = StockMovement.objects.select_related('item', 'created_by').order_by('-timestamp')[:10]
     
+    # Bakery-specific analytics
+    bakery_analytics = {
+        'total_ingredients': Item.objects.filter(category='ingredient', is_active=True).count(),
+        'total_finished_goods': Item.objects.filter(category='finished_good', is_active=True).count(),
+        'total_recipes': Recipe.objects.filter(is_active=True).count(),
+        'active_suppliers': Supplier.objects.filter(is_active=True).count(),
+    }
+    
+    # Production analytics (last 30 days)
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    production_stats = {
+        'total_productions': StockMovement.objects.filter(
+            movement_type='produce',
+            timestamp__gte=thirty_days_ago
+        ).count(),
+        'total_consumption': StockMovement.objects.filter(
+            movement_type='consume',
+            timestamp__gte=thirty_days_ago
+        ).count(),
+        'total_receipts': StockMovement.objects.filter(
+            movement_type='receive',
+            timestamp__gte=thirty_days_ago
+        ).count(),
+    }
+    
+    # Daily production trend (last 7 days)
+    daily_production = []
+    daily_consumption = []
+    daily_receipts = []
+    date_labels = []
+    
+    for i in range(7):
+        date = timezone.now().date() - timedelta(days=6-i)
+        date_labels.append(date.strftime('%m/%d'))
+        
+        # Production
+        prod_count = StockMovement.objects.filter(
+            movement_type='produce',
+            timestamp__date=date
+        ).count()
+        daily_production.append(prod_count)
+        
+        # Consumption
+        cons_count = StockMovement.objects.filter(
+            movement_type='consume',
+            timestamp__date=date
+        ).count()
+        daily_consumption.append(cons_count)
+        
+        # Receipts
+        rec_count = StockMovement.objects.filter(
+            movement_type='receive',
+            timestamp__date=date
+        ).count()
+        daily_receipts.append(rec_count)
+    
+    # Top selling items (by consumption)
+    top_consumed_items = StockMovement.objects.filter(
+        movement_type='consume',
+        timestamp__gte=thirty_days_ago
+    ).values('item__name', 'item__code').annotate(
+        total_qty=Sum('qty')
+    ).order_by('-total_qty')[:5]
+    
+    # Category distribution
+    category_distribution = Item.objects.filter(is_active=True).values('category').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    # Expiry trend (next 30 days)
+    expiry_trend = []
+    expiry_labels = []
+    for i in range(30):
+        date = timezone.now().date() + timedelta(days=i)
+        expiry_labels.append(date.strftime('%m/%d'))
+        
+        expiring_count = StockLot.objects.filter(
+            qty__gt=0,
+            expires_at=date,
+            expires_at__isnull=False
+        ).count()
+        expiry_trend.append(expiring_count)
+    
     context = {
         'stock_summary': stock_summary,
         'low_stock_items': low_stock_items,
         'expiring_items': expiring_items,
         'expired_items': expired_items,
         'recent_movements': recent_movements,
+        'bakery_analytics': bakery_analytics,
+        'production_stats': production_stats,
+        'daily_production': json.dumps(daily_production),
+        'daily_consumption': json.dumps(daily_consumption),
+        'daily_receipts': json.dumps(daily_receipts),
+        'date_labels': json.dumps(date_labels),
+        'top_consumed_items': top_consumed_items,
+        'category_distribution': category_distribution,
+        'expiry_trend': json.dumps(expiry_trend),
+        'expiry_labels': json.dumps(expiry_labels),
     }
     
     return render(request, 'inventory/inventory_dashboard.html', context)
