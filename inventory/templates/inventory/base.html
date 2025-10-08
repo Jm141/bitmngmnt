@@ -1073,23 +1073,27 @@
                     <i class="fas fa-house nav-icon"></i>
                     Dashboard
                 </a>
-                <a class="nav-item" href="#">
+                <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="{% url 'inventory:inventory_dashboard' %}">
                     <i class="fas fa-box nav-icon"></i>
                     Inventory
                 </a>
-                <a class="nav-item" href="#">
+                <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' or request.resolver_match.url_name == 'item_create' or request.resolver_match.url_name == 'item_update' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
                     <i class="fas fa-bag-shopping nav-icon"></i>
-                    Products
+                    Items
                 </a>
-                <a class="nav-item" href="#">
-                    <i class="fas fa-cart-shopping nav-icon"></i>
-                    Orders
+                <a class="nav-item {% if request.resolver_match.url_name == 'stock_receive' or request.resolver_match.url_name == 'stock_consume' or request.resolver_match.url_name == 'production_create' %}active{% endif %}" href="{% url 'inventory:stock_receive' %}">
+                    <i class="fas fa-exchange-alt nav-icon"></i>
+                    Stock Operations
                 </a>
-                <a class="nav-item" href="#">
+                <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
                     <i class="fas fa-truck nav-icon"></i>
                     Suppliers
                 </a>
-                <a class="nav-item" href="#">
+                <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' or request.resolver_match.url_name == 'recipe_create' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
+                    <i class="fas fa-book nav-icon"></i>
+                    Recipes
+                </a>
+                <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
                     <i class="fas fa-chart-bar nav-icon"></i>
                     Reports
                 </a>

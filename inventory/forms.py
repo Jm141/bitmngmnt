@@ -1,7 +1,9 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
-from .models import User, UserAccess, UserLinks
+from django.utils import timezone
+from datetime import timedelta
+from .models import User, UserAccess, UserLinks, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem
 from .security import validate_user_input, sanitize_input
 
 
@@ -350,3 +352,358 @@ class PasswordChangeForm(forms.Form):
         self.user.set_password(password)
         self.user.save()
         return self.user
+
+
+# --- INVENTORY FORMS ---
+
+class SupplierForm(forms.ModelForm):
+    """
+    Form for managing suppliers
+    """
+    class Meta:
+        model = Supplier
+        fields = ['name', 'contact_person', 'phone', 'email', 'address', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        if name:
+            name = name.strip()
+            # Check for duplicate name
+            if Supplier.objects.filter(name__iexact=name).exclude(pk=self.instance.pk).exists():
+                raise ValidationError("A supplier with this name already exists.")
+        return name
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email:
+            email = email.lower().strip()
+            # Check for duplicate email
+            if Supplier.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
+                raise ValidationError("A supplier with this email already exists.")
+        return email
+
+
+class ItemForm(forms.ModelForm):
+    """
+    Form for managing items
+    """
+    class Meta:
+        model = Item
+        fields = ['code', 'name', 'category', 'unit', 'description', 'reorder_level', 'min_order_qty', 'is_perishable', 'shelf_life_days', 'is_active']
+        widgets = {
+            'code': forms.TextInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'category': forms.Select(attrs={'class': 'form-control'}),
+            'unit': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'reorder_level': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'min_order_qty': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'is_perishable': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'shelf_life_days': forms.NumberInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean_code(self):
+        code = self.cleaned_data.get('code')
+        if code:
+            code = code.upper().strip()
+            # Check for duplicate code
+            if Item.objects.filter(code=code).exclude(pk=self.instance.pk).exists():
+                raise ValidationError("An item with this code already exists.")
+        return code
+
+    def clean(self):
+        cleaned_data = super().clean()
+        is_perishable = cleaned_data.get('is_perishable')
+        shelf_life_days = cleaned_data.get('shelf_life_days')
+
+        if is_perishable and shelf_life_days == 0:
+            raise ValidationError("Shelf life days must be greater than 0 for perishable items.")
+
+        return cleaned_data
+
+
+class StockLotForm(forms.ModelForm):
+    """
+    Form for managing stock lots
+    """
+    class Meta:
+        model = StockLot
+        fields = ['item', 'lot_no', 'qty', 'unit', 'expires_at', 'unit_cost', 'supplier', 'notes']
+        widgets = {
+            'item': forms.Select(attrs={'class': 'form-control'}),
+            'lot_no': forms.TextInput(attrs={'class': 'form-control'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'unit': forms.Select(attrs={'class': 'form-control'}),
+            'expires_at': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'unit_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'supplier': forms.Select(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter items to only show active ones
+        self.fields['item'].queryset = Item.objects.filter(is_active=True)
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
+
+    def clean_qty(self):
+        qty = self.cleaned_data.get('qty')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0.")
+        return qty
+
+    def clean_unit_cost(self):
+        unit_cost = self.cleaned_data.get('unit_cost')
+        if unit_cost is not None and unit_cost < 0:
+            raise ValidationError("Unit cost cannot be negative.")
+        return unit_cost
+
+
+class StockMovementForm(forms.ModelForm):
+    """
+    Form for managing stock movements
+    """
+    class Meta:
+        model = StockMovement
+        fields = ['item', 'lot', 'movement_type', 'qty', 'unit', 'ref_no', 'reason', 'notes']
+        widgets = {
+            'item': forms.Select(attrs={'class': 'form-control'}),
+            'lot': forms.Select(attrs={'class': 'form-control'}),
+            'movement_type': forms.Select(attrs={'class': 'form-control'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'unit': forms.Select(attrs={'class': 'form-control'}),
+            'ref_no': forms.TextInput(attrs={'class': 'form-control'}),
+            'reason': forms.TextInput(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter items to only show active ones
+        self.fields['item'].queryset = Item.objects.filter(is_active=True)
+        # Filter lots to only show those with quantity > 0
+        self.fields['lot'].queryset = StockLot.objects.filter(qty__gt=0)
+
+    def clean_qty(self):
+        qty = self.cleaned_data.get('qty')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0.")
+        return qty
+
+    def clean(self):
+        cleaned_data = super().clean()
+        movement_type = cleaned_data.get('movement_type')
+        lot = cleaned_data.get('lot')
+        qty = cleaned_data.get('qty')
+
+        # For outbound movements, check if lot has enough quantity
+        if movement_type in ['consume', 'spoilage', 'transfer'] and lot and qty:
+            if qty > lot.qty:
+                raise ValidationError(f"Insufficient stock. Available: {lot.qty} {lot.unit}")
+
+        return cleaned_data
+
+
+class RecipeForm(forms.ModelForm):
+    """
+    Form for managing recipes
+    """
+    class Meta:
+        model = Recipe
+        fields = ['name', 'product', 'yield_qty', 'yield_unit', 'description', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'product': forms.Select(attrs={'class': 'form-control'}),
+            'yield_qty': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'yield_unit': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter products to only show finished goods
+        self.fields['product'].queryset = Item.objects.filter(category='finished_good', is_active=True)
+
+    def clean_yield_qty(self):
+        yield_qty = self.cleaned_data.get('yield_qty')
+        if yield_qty is not None and yield_qty <= 0:
+            raise ValidationError("Yield quantity must be greater than 0.")
+        return yield_qty
+
+
+class RecipeItemForm(forms.ModelForm):
+    """
+    Form for managing recipe items
+    """
+    class Meta:
+        model = RecipeItem
+        fields = ['ingredient', 'qty', 'unit', 'loss_factor', 'notes']
+        widgets = {
+            'ingredient': forms.Select(attrs={'class': 'form-control'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'unit': forms.Select(attrs={'class': 'form-control'}),
+            'loss_factor': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter ingredients to only show active ones
+        self.fields['ingredient'].queryset = Item.objects.filter(category='ingredient', is_active=True)
+
+    def clean_qty(self):
+        qty = self.cleaned_data.get('qty')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0.")
+        return qty
+
+    def clean_loss_factor(self):
+        loss_factor = self.cleaned_data.get('loss_factor')
+        if loss_factor is not None and (loss_factor < 0 or loss_factor > 100):
+            raise ValidationError("Loss factor must be between 0 and 100.")
+        return loss_factor
+
+
+class StockReceiveForm(forms.Form):
+    """
+    Form for receiving stock
+    """
+    item = forms.ModelChoiceField(
+        queryset=Item.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    lot_no = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    qty = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+    unit = forms.ChoiceField(
+        choices=Item.UNIT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    expires_at = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+    unit_cost = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.filter(is_active=True),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    ref_no = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3})
+    )
+
+    def clean_qty(self):
+        qty = self.cleaned_data.get('qty')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0.")
+        return qty
+
+    def clean_unit_cost(self):
+        unit_cost = self.cleaned_data.get('unit_cost')
+        if unit_cost is not None and unit_cost < 0:
+            raise ValidationError("Unit cost cannot be negative.")
+        return unit_cost
+
+
+class StockConsumeForm(forms.Form):
+    """
+    Form for consuming stock
+    """
+    item = forms.ModelChoiceField(
+        queryset=Item.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    lot = forms.ModelChoiceField(
+        queryset=StockLot.objects.filter(qty__gt=0),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    qty = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+    unit = forms.ChoiceField(
+        choices=Item.UNIT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    reason = forms.CharField(
+        max_length=200,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    ref_no = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3})
+    )
+
+    def clean_qty(self):
+        qty = self.cleaned_data.get('qty')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0.")
+        return qty
+
+
+class ProductionForm(forms.Form):
+    """
+    Form for production workflow
+    """
+    recipe = forms.ModelChoiceField(
+        queryset=Recipe.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    production_qty = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+    lot_no = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    expires_at = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3})
+    )
+
+    def clean_production_qty(self):
+        production_qty = self.cleaned_data.get('production_qty')
+        if production_qty is not None and production_qty <= 0:
+            raise ValidationError("Production quantity must be greater than 0.")
+        return production_qty

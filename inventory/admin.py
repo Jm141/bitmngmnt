@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import User, UserLinks, UserAccess, AuditLog
+from .models import User, UserLinks, UserAccess, AuditLog, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem
 
 
 @admin.register(User)
@@ -96,3 +96,154 @@ class AuditLogAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# --- INVENTORY ADMIN ---
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    """
+    Admin for Supplier management
+    """
+    list_display = ('name', 'contact_person', 'phone', 'email', 'is_active', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name', 'contact_person', 'email', 'phone')
+    ordering = ('name',)
+    
+    fieldsets = (
+        (None, {'fields': ('name', 'contact_person')}),
+        ('Contact Information', {'fields': ('phone', 'email', 'address')}),
+        ('Status', {'fields': ('is_active',)}),
+        ('Metadata', {'fields': ('created_at', 'updated_at', 'created_by')}),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Creating new supplier
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Item)
+class ItemAdmin(admin.ModelAdmin):
+    """
+    Admin for Item management
+    """
+    list_display = ('code', 'name', 'category', 'unit', 'reorder_level', 'is_perishable', 'is_active', 'created_at')
+    list_filter = ('category', 'is_perishable', 'is_active', 'created_at')
+    search_fields = ('code', 'name', 'description')
+    ordering = ('code',)
+    
+    fieldsets = (
+        ('Basic Information', {'fields': ('code', 'name', 'category', 'unit', 'description')}),
+        ('Stock Management', {'fields': ('reorder_level', 'min_order_qty')}),
+        ('Perishable Settings', {'fields': ('is_perishable', 'shelf_life_days')}),
+        ('Status', {'fields': ('is_active',)}),
+        ('Metadata', {'fields': ('created_at', 'updated_at', 'created_by')}),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Creating new item
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(StockLot)
+class StockLotAdmin(admin.ModelAdmin):
+    """
+    Admin for StockLot management
+    """
+    list_display = ('item', 'lot_no', 'qty', 'unit', 'supplier', 'expires_at', 'unit_cost', 'received_at')
+    list_filter = ('item__category', 'supplier', 'expires_at', 'received_at')
+    search_fields = ('item__code', 'item__name', 'lot_no', 'supplier__name')
+    ordering = ('-received_at',)
+    
+    fieldsets = (
+        ('Lot Information', {'fields': ('item', 'lot_no', 'qty', 'unit')}),
+        ('Supplier & Cost', {'fields': ('supplier', 'unit_cost')}),
+        ('Expiry', {'fields': ('expires_at',)}),
+        ('Notes', {'fields': ('notes',)}),
+        ('Metadata', {'fields': ('received_at', 'created_by')}),
+    )
+    
+    readonly_fields = ('received_at',)
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Creating new lot
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    """
+    Admin for StockMovement management (read-only)
+    """
+    list_display = ('item', 'movement_type', 'qty', 'unit', 'lot', 'reason', 'created_by', 'timestamp')
+    list_filter = ('movement_type', 'timestamp', 'created_by')
+    search_fields = ('item__code', 'item__name', 'reason', 'ref_no')
+    ordering = ('-timestamp',)
+    readonly_fields = ('item', 'lot', 'movement_type', 'qty', 'unit', 'ref_no', 'reason', 'notes', 'created_by', 'timestamp')
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class RecipeItemInline(admin.TabularInline):
+    """
+    Inline admin for RecipeItem
+    """
+    model = RecipeItem
+    extra = 1
+    fields = ('ingredient', 'qty', 'unit', 'loss_factor', 'notes')
+
+
+@admin.register(Recipe)
+class RecipeAdmin(admin.ModelAdmin):
+    """
+    Admin for Recipe management
+    """
+    list_display = ('name', 'product', 'yield_qty', 'yield_unit', 'is_active', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name', 'product__code', 'product__name', 'description')
+    ordering = ('name',)
+    inlines = [RecipeItemInline]
+    
+    fieldsets = (
+        ('Recipe Information', {'fields': ('name', 'product', 'yield_qty', 'yield_unit', 'description')}),
+        ('Status', {'fields': ('is_active',)}),
+        ('Metadata', {'fields': ('created_at', 'updated_at', 'created_by')}),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Creating new recipe
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(RecipeItem)
+class RecipeItemAdmin(admin.ModelAdmin):
+    """
+    Admin for RecipeItem management
+    """
+    list_display = ('recipe', 'ingredient', 'qty', 'unit', 'loss_factor')
+    list_filter = ('recipe', 'ingredient__category')
+    search_fields = ('recipe__name', 'ingredient__code', 'ingredient__name')
+    ordering = ('recipe', 'ingredient')
+    
+    fieldsets = (
+        ('Recipe Item', {'fields': ('recipe', 'ingredient', 'qty', 'unit')}),
+        ('Loss Factor', {'fields': ('loss_factor',)}),
+        ('Notes', {'fields': ('notes',)}),
+    )

@@ -1,0 +1,224 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">{{ title }}</h1>
+                <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Receive Stock</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.item.id_for_label }}">{{ form.item.label }}</label>
+                                    {{ form.item }}
+                                    {% if form.item.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.item.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.lot_no.id_for_label }}">{{ form.lot_no.label }}</label>
+                                    {{ form.lot_no }}
+                                    {% if form.lot_no.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.lot_no.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.qty.id_for_label }}">{{ form.qty.label }}</label>
+                                    {{ form.qty }}
+                                    {% if form.qty.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.qty.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.unit.id_for_label }}">{{ form.unit.label }}</label>
+                                    {{ form.unit }}
+                                    {% if form.unit.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.unit.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.unit_cost.id_for_label }}">{{ form.unit_cost.label }}</label>
+                                    {{ form.unit_cost }}
+                                    {% if form.unit_cost.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.unit_cost.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.supplier.id_for_label }}">{{ form.supplier.label }}</label>
+                                    {{ form.supplier }}
+                                    {% if form.supplier.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.supplier.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+                                    {{ form.expires_at }}
+                                    {% if form.expires_at.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.expires_at.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.ref_no.id_for_label }}">{{ form.ref_no.label }}</label>
+                                    {{ form.ref_no }}
+                                    {% if form.ref_no.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.ref_no.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.notes.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-plus"></i> Receive Stock
+                            </button>
+                            <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Help</h6>
+                </div>
+                <div class="card-body">
+                    <h6>Lot Number</h6>
+                    <p class="text-muted small">Unique identifier for this batch of stock. Can be supplier batch number or internal reference.</p>
+                    
+                    <h6>Expiry Date</h6>
+                    <p class="text-muted small">Required for perishable items. Leave blank for non-perishable items.</p>
+                    
+                    <h6>Unit Cost</h6>
+                    <p class="text-muted small">Cost per unit for this lot. Used for inventory valuation and cost calculations.</p>
+                    
+                    <h6>Reference Number</h6>
+                    <p class="text-muted small">Optional reference like purchase order number, delivery receipt, etc.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const itemSelect = document.getElementById('{{ form.item.id_for_label }}');
+    const expiryField = document.getElementById('{{ form.expires_at.id_for_label }}');
+    
+    function updateExpiryField() {
+        const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+        const itemData = selectedOption.dataset;
+        
+        if (itemData.perishable === 'true') {
+            expiryField.required = true;
+            expiryField.disabled = false;
+        } else {
+            expiryField.required = false;
+            expiryField.disabled = true;
+            expiryField.value = '';
+        }
+    }
+    
+    itemSelect.addEventListener('change', updateExpiryField);
+    updateExpiryField(); // Initial call
+});
+</script>
+{% endblock %}

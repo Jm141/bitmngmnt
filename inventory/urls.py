@@ -29,4 +29,30 @@ urlpatterns = [
     
     # Admin Attendance Overview
     path('attendance-overview/', views.admin_attendance_overview, name='admin_attendance_overview'),
+    
+    # Inventory Management URLs
+    path('inventory/', views.inventory_dashboard, name='inventory_dashboard'),
+    
+    # Items
+    path('items/', views.item_list, name='item_list'),
+    path('items/create/', views.item_create, name='item_create'),
+    path('items/<uuid:item_id>/', views.item_detail, name='item_detail'),
+    path('items/<uuid:item_id>/update/', views.item_update, name='item_update'),
+    
+    # Stock Operations
+    path('stock/receive/', views.stock_receive, name='stock_receive'),
+    path('stock/consume/', views.stock_consume, name='stock_consume'),
+    path('production/', views.production_create, name='production_create'),
+    
+    # Suppliers
+    path('suppliers/', views.supplier_list, name='supplier_list'),
+    path('suppliers/create/', views.supplier_create, name='supplier_create'),
+    
+    # Recipes
+    path('recipes/', views.recipe_list, name='recipe_list'),
+    path('recipes/create/', views.recipe_create, name='recipe_create'),
+    path('recipes/<uuid:recipe_id>/', views.recipe_detail, name='recipe_detail'),
+    
+    # Reports
+    path('reports/stock/', views.stock_report, name='stock_report'),
 ]

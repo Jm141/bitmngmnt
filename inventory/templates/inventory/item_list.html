@@ -1,0 +1,178 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Items{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Items</h1>
+                <a href="{% url 'inventory:item_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Item
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" name="search" 
+                                   placeholder="Search by code, name, or description..." 
+                                   value="{{ search_query }}">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-control" name="category">
+                                <option value="">All Categories</option>
+                                {% for value, label in category_choices %}
+                                <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                        <div class="col-md-3 text-right">
+                            <a href="{% url 'inventory:item_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Items List</h6>
+                </div>
+                <div class="card-body">
+                    {% if items_with_stock %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Category</th>
+                                        <th>Unit</th>
+                                        <th>Current Stock</th>
+                                        <th>Reorder Level</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item_data in items_with_stock %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ item_data.item.code }}</strong>
+                                        </td>
+                                        <td>{{ item_data.item.name }}</td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                {{ item_data.item.get_category_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ item_data.item.get_unit_display }}</td>
+                                        <td>
+                                            <span class="{% if item_data.is_low_stock %}text-danger{% endif %}">
+                                                {{ item_data.current_stock }}
+                                            </span>
+                                        </td>
+                                        <td>{{ item_data.item.reorder_level }}</td>
+                                        <td>
+                                            {% if item_data.is_low_stock %}
+                                                <span class="badge badge-warning">Low Stock</span>
+                                            {% elif item_data.expiring_soon > 0 %}
+                                                <span class="badge badge-info">Expiring Soon</span>
+                                            {% else %}
+                                                <span class="badge badge-success">OK</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'inventory:item_detail' item_data.item.id %}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'inventory:item_update' item_data.item.id %}" 
+                                                   class="btn btn-sm btn-outline-warning">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if items_with_stock.has_other_pages %}
+                        <nav aria-label="Items pagination">
+                            <ul class="pagination justify-content-center">
+                                {% if items_with_stock.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}">First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ items_with_stock.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}">Previous</a>
+                                    </li>
+                                {% endif %}
+
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Page {{ items_with_stock.number }} of {{ items_with_stock.paginator.num_pages }}
+                                    </span>
+                                </li>
+
+                                {% if items_with_stock.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ items_with_stock.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ items_with_stock.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}">Last</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-boxes fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No items found</h5>
+                            <p class="text-muted">
+                                {% if search_query or category_filter %}
+                                    Try adjusting your search criteria.
+                                {% else %}
+                                    Start by adding your first item.
+                                {% endif %}
+                            </p>
+                            {% if not search_query and not category_filter %}
+                                <a href="{% url 'inventory:item_create' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i> Add First Item
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

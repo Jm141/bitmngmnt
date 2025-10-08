@@ -11,13 +11,14 @@ from django.utils import timezone
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
-from .models import User, UserLinks, UserAccess, AuditLog, AttendanceRecord, ShiftSchedule
+from .models import User, UserLinks, UserAccess, AuditLog, AttendanceRecord, ShiftSchedule, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem
 from .security import (
     role_required, permission_required, super_admin_required, admin_required,
     log_user_action, validate_user_input, sanitize_input, can_manage_user,
     get_user_permissions, check_user_permissions
 )
-from .forms import UserForm, UserAccessForm, UserLinksForm
+from .forms import UserForm, UserAccessForm, UserLinksForm, SupplierForm, ItemForm, StockLotForm, StockMovementForm, RecipeForm, RecipeItemForm, StockReceiveForm, StockConsumeForm, ProductionForm
+from .services import InventoryService, RecipeService
 import json
 
 
@@ -580,3 +581,525 @@ def admin_attendance_overview(request):
     )
     
     return render(request, 'inventory/admin_attendance_overview.html', context)
+
+
+# --- INVENTORY MANAGEMENT VIEWS ---
+
+@login_required
+@permission_required('inventory_read')
+def inventory_dashboard(request):
+    """
+    Inventory dashboard with KPIs and alerts
+    """
+    # Get stock summary
+    stock_summary = InventoryService.get_stock_summary()
+    
+    # Get low stock items
+    low_stock_items = InventoryService.get_low_stock_items()
+    
+    # Get expiring items (next 7 days)
+    expiring_items = InventoryService.get_expiring_items(days=7)
+    
+    # Get expired items
+    expired_items = InventoryService.get_expired_items()
+    
+    # Recent movements
+    recent_movements = StockMovement.objects.select_related('item', 'created_by').order_by('-timestamp')[:10]
+    
+    context = {
+        'stock_summary': stock_summary,
+        'low_stock_items': low_stock_items,
+        'expiring_items': expiring_items,
+        'expired_items': expired_items,
+        'recent_movements': recent_movements,
+    }
+    
+    return render(request, 'inventory/inventory_dashboard.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def item_list(request):
+    """
+    List all items with search and filter
+    """
+    search_query = request.GET.get('search', '')
+    category_filter = request.GET.get('category', '')
+    
+    items = Item.objects.all()
+    
+    # Apply search filter
+    if search_query:
+        items = items.filter(
+            Q(code__icontains=search_query) |
+            Q(name__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
+    
+    # Apply category filter
+    if category_filter:
+        items = items.filter(category=category_filter)
+    
+    # Add current stock information
+    items_with_stock = []
+    for item in items:
+        current_stock = item.get_current_stock()
+        items_with_stock.append({
+            'item': item,
+            'current_stock': current_stock,
+            'is_low_stock': item.is_low_stock(),
+            'expiring_soon': item.get_expiring_soon().count()
+        })
+    
+    # Pagination
+    paginator = Paginator(items_with_stock, 20)
+    page_number = request.GET.get('page')
+    items_with_stock = paginator.get_page(page_number)
+    
+    context = {
+        'items_with_stock': items_with_stock,
+        'search_query': search_query,
+        'category_filter': category_filter,
+        'category_choices': Item.CATEGORY_CHOICES,
+    }
+    
+    return render(request, 'inventory/item_list.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def item_detail(request, item_id):
+    """
+    View item details with stock lots and movements
+    """
+    item = get_object_or_404(Item, id=item_id)
+    
+    # Get stock lots
+    stock_lots = StockLot.objects.filter(item=item).order_by('-received_at')
+    
+    # Get recent movements
+    movements = StockMovement.objects.filter(item=item).order_by('-timestamp')[:20]
+    
+    # Get current stock
+    current_stock = item.get_current_stock()
+    
+    # Get expiring lots
+    expiring_lots = item.get_expiring_soon()
+    
+    context = {
+        'item': item,
+        'stock_lots': stock_lots,
+        'movements': movements,
+        'current_stock': current_stock,
+        'expiring_lots': expiring_lots,
+    }
+    
+    return render(request, 'inventory/item_detail.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def item_create(request):
+    """
+    Create new item
+    """
+    if request.method == 'POST':
+        form = ItemForm(request.POST)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.created_by = request.user
+            item.save()
+            
+            log_user_action(
+                user=request.user,
+                action_type='create',
+                target_model='Item',
+                target_id=item.id,
+                description=f"Created item {item.code} - {item.name}",
+                request=request
+            )
+            
+            messages.success(request, f"Item {item.code} created successfully.")
+            return redirect('inventory:item_detail', item_id=item.id)
+    else:
+        form = ItemForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Item',
+    }
+    
+    return render(request, 'inventory/item_form.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def item_update(request, item_id):
+    """
+    Update item
+    """
+    item = get_object_or_404(Item, id=item_id)
+    
+    if request.method == 'POST':
+        form = ItemForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='Item',
+                target_id=item_id,
+                description=f"Updated item {item.code}",
+                request=request
+            )
+            
+            messages.success(request, f"Item {item.code} updated successfully.")
+            return redirect('inventory:item_detail', item_id=item.id)
+    else:
+        form = ItemForm(instance=item)
+    
+    context = {
+        'form': form,
+        'item': item,
+        'title': f'Update Item: {item.code}',
+    }
+    
+    return render(request, 'inventory/item_form.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def stock_receive(request):
+    """
+    Receive stock workflow
+    """
+    if request.method == 'POST':
+        form = StockReceiveForm(request.POST)
+        if form.is_valid():
+            try:
+                lot = InventoryService.receive_stock(
+                    item=form.cleaned_data['item'],
+                    lot_no=form.cleaned_data['lot_no'],
+                    qty=form.cleaned_data['qty'],
+                    unit=form.cleaned_data['unit'],
+                    user=request.user,
+                    supplier=form.cleaned_data.get('supplier'),
+                    expires_at=form.cleaned_data.get('expires_at'),
+                    unit_cost=form.cleaned_data['unit_cost'],
+                    ref_no=form.cleaned_data.get('ref_no'),
+                    notes=form.cleaned_data.get('notes')
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='create',
+                    target_model='StockLot',
+                    target_id=lot.id,
+                    description=f"Received stock: {lot.item.code} - Lot {lot.lot_no}",
+                    request=request
+                )
+                
+                messages.success(request, f"Stock received successfully. Lot: {lot.lot_no}")
+                return redirect('inventory:item_detail', item_id=lot.item.id)
+                
+            except Exception as e:
+                messages.error(request, f"Error receiving stock: {str(e)}")
+    else:
+        form = StockReceiveForm()
+    
+    context = {
+        'form': form,
+        'title': 'Receive Stock',
+    }
+    
+    return render(request, 'inventory/stock_receive.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def stock_consume(request):
+    """
+    Consume stock workflow
+    """
+    if request.method == 'POST':
+        form = StockConsumeForm(request.POST)
+        if form.is_valid():
+            try:
+                InventoryService.consume_stock(
+                    item=form.cleaned_data['item'],
+                    qty=form.cleaned_data['qty'],
+                    reason=form.cleaned_data['reason'],
+                    user=request.user,
+                    lot=form.cleaned_data.get('lot'),
+                    ref_no=form.cleaned_data.get('ref_no'),
+                    notes=form.cleaned_data.get('notes')
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='update',
+                    target_model='StockMovement',
+                    description=f"Consumed stock: {form.cleaned_data['item'].code}",
+                    request=request
+                )
+                
+                messages.success(request, "Stock consumed successfully.")
+                return redirect('inventory:item_detail', item_id=form.cleaned_data['item'].id)
+                
+            except Exception as e:
+                messages.error(request, f"Error consuming stock: {str(e)}")
+    else:
+        form = StockConsumeForm()
+    
+    context = {
+        'form': form,
+        'title': 'Consume Stock',
+    }
+    
+    return render(request, 'inventory/stock_consume.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def production_create(request):
+    """
+    Production workflow
+    """
+    if request.method == 'POST':
+        form = ProductionForm(request.POST)
+        if form.is_valid():
+            try:
+                recipe = form.cleaned_data['recipe']
+                production_qty = form.cleaned_data['production_qty']
+                
+                # Validate production
+                validation = RecipeService.validate_recipe_production(recipe, production_qty)
+                
+                if not validation['can_produce']:
+                    messages.error(request, "Cannot produce due to insufficient ingredients:")
+                    for missing in validation['missing_ingredients']:
+                        messages.error(request, f"- {missing['ingredient'].name}: Need {missing['needed']}, Available {missing['available']}")
+                    return render(request, 'inventory/production_form.html', {'form': form, 'title': 'Production'})
+                
+                # Proceed with production
+                lot = InventoryService.produce_stock(
+                    recipe=recipe,
+                    production_qty=production_qty,
+                    lot_no=form.cleaned_data['lot_no'],
+                    user=request.user,
+                    expires_at=form.cleaned_data.get('expires_at'),
+                    notes=form.cleaned_data.get('notes')
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='create',
+                    target_model='StockLot',
+                    target_id=lot.id,
+                    description=f"Produced: {recipe.product.code} - Lot {lot.lot_no}",
+                    request=request
+                )
+                
+                messages.success(request, f"Production completed successfully. Lot: {lot.lot_no}")
+                return redirect('inventory:item_detail', item_id=recipe.product.id)
+                
+            except Exception as e:
+                messages.error(request, f"Error in production: {str(e)}")
+    else:
+        form = ProductionForm()
+    
+    context = {
+        'form': form,
+        'title': 'Production',
+    }
+    
+    return render(request, 'inventory/production_form.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def supplier_list(request):
+    """
+    List all suppliers
+    """
+    suppliers = Supplier.objects.all().order_by('name')
+    
+    # Pagination
+    paginator = Paginator(suppliers, 20)
+    page_number = request.GET.get('page')
+    suppliers = paginator.get_page(page_number)
+    
+    context = {
+        'suppliers': suppliers,
+    }
+    
+    return render(request, 'inventory/supplier_list.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def supplier_create(request):
+    """
+    Create new supplier
+    """
+    if request.method == 'POST':
+        form = SupplierForm(request.POST)
+        if form.is_valid():
+            supplier = form.save(commit=False)
+            supplier.created_by = request.user
+            supplier.save()
+            
+            log_user_action(
+                user=request.user,
+                action_type='create',
+                target_model='Supplier',
+                target_id=supplier.id,
+                description=f"Created supplier {supplier.name}",
+                request=request
+            )
+            
+            messages.success(request, f"Supplier {supplier.name} created successfully.")
+            return redirect('inventory:supplier_list')
+    else:
+        form = SupplierForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Supplier',
+    }
+    
+    return render(request, 'inventory/supplier_form.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def recipe_list(request):
+    """
+    List all recipes
+    """
+    recipes = Recipe.objects.filter(is_active=True).order_by('name')
+    
+    # Add cost information
+    recipes_with_cost = []
+    for recipe in recipes:
+        total_cost = RecipeService.calculate_recipe_cost(recipe)
+        recipes_with_cost.append({
+            'recipe': recipe,
+            'total_cost': total_cost,
+            'cost_per_unit': total_cost / recipe.yield_qty if recipe.yield_qty > 0 else 0
+        })
+    
+    # Pagination
+    paginator = Paginator(recipes_with_cost, 20)
+    page_number = request.GET.get('page')
+    recipes_with_cost = paginator.get_page(page_number)
+    
+    context = {
+        'recipes_with_cost': recipes_with_cost,
+    }
+    
+    return render(request, 'inventory/recipe_list.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def recipe_detail(request, recipe_id):
+    """
+    View recipe details
+    """
+    recipe = get_object_or_404(Recipe, id=recipe_id)
+    
+    # Get recipe items
+    recipe_items = RecipeItem.objects.filter(recipe=recipe)
+    
+    # Calculate costs
+    total_cost = RecipeService.calculate_recipe_cost(recipe)
+    cost_per_unit = total_cost / recipe.yield_qty if recipe.yield_qty > 0 else 0
+    
+    context = {
+        'recipe': recipe,
+        'recipe_items': recipe_items,
+        'total_cost': total_cost,
+        'cost_per_unit': cost_per_unit,
+    }
+    
+    return render(request, 'inventory/recipe_detail.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def recipe_create(request):
+    """
+    Create new recipe
+    """
+    if request.method == 'POST':
+        form = RecipeForm(request.POST)
+        if form.is_valid():
+            recipe = form.save(commit=False)
+            recipe.created_by = request.user
+            recipe.save()
+            
+            log_user_action(
+                user=request.user,
+                action_type='create',
+                target_model='Recipe',
+                target_id=recipe.id,
+                description=f"Created recipe {recipe.name}",
+                request=request
+            )
+            
+            messages.success(request, f"Recipe {recipe.name} created successfully.")
+            return redirect('inventory:recipe_detail', recipe_id=recipe.id)
+    else:
+        form = RecipeForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Recipe',
+    }
+    
+    return render(request, 'inventory/recipe_form.html', context)
+
+
+@login_required
+@permission_required('reports_read')
+def stock_report(request):
+    """
+    Stock report with filters
+    """
+    # Get filters
+    category_filter = request.GET.get('category', '')
+    low_stock_only = request.GET.get('low_stock', False)
+    
+    items = Item.objects.filter(is_active=True)
+    
+    if category_filter:
+        items = items.filter(category=category_filter)
+    
+    # Build report data
+    report_data = []
+    for item in items:
+        current_stock = item.get_current_stock()
+        is_low_stock = item.is_low_stock()
+        
+        if low_stock_only and not is_low_stock:
+            continue
+        
+        report_data.append({
+            'item': item,
+            'current_stock': current_stock,
+            'reorder_level': item.reorder_level,
+            'is_low_stock': is_low_stock,
+            'expiring_soon': item.get_expiring_soon().count(),
+            'unit_cost': InventoryService.calculate_item_cost(item)
+        })
+    
+    context = {
+        'report_data': report_data,
+        'category_filter': category_filter,
+        'low_stock_only': low_stock_only,
+        'category_choices': Item.CATEGORY_CHOICES,
+    }
+    
+    return render(request, 'inventory/stock_report.html', context)
