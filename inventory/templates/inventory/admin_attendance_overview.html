@@ -1,0 +1,258 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Staff Attendance Overview - Admin{% endblock %}
+{% block page_title %}Staff Attendance Overview{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div class="space-y-1">
+            <h1 class="font-serif text-3xl md:text-4xl tracking-tight">
+                Staff Attendance Overview
+            </h1>
+            <p class="text-muted-foreground">Monitor and track all staff attendance records</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="text-sm text-muted-foreground">
+                <i class="fas fa-users mr-1"></i>
+                {{ active_staff }} Active Staff
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">Total Records</p>
+                        <p class="text-2xl font-bold">{{ total_records }}</p>
+                    </div>
+                    <div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                        <i class="fas fa-clipboard-list text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">Today's Records</p>
+                        <p class="text-2xl font-bold">{{ today_records }}</p>
+                    </div>
+                    <div class="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                        <i class="fas fa-calendar-day text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">Active Staff</p>
+                        <p class="text-2xl font-bold">{{ active_staff }}</p>
+                    </div>
+                    <div class="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                        <i class="fas fa-user-check text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold">Filters</h3>
+        </div>
+        <div class="card-body">
+            <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="date_from" class="form-label">Date From</label>
+                    <input type="date" class="form-input" id="date_from" name="date_from" value="{{ date_from }}">
+                </div>
+                <div>
+                    <label for="date_to" class="form-label">Date To</label>
+                    <input type="date" class="form-input" id="date_to" name="date_to" value="{{ date_to }}">
+                </div>
+                <div>
+                    <label for="user" class="form-label">Staff Member</label>
+                    <select class="form-input" id="user" name="user">
+                        <option value="">All Staff</option>
+                        {% for user in staff_users %}
+                        <option value="{{ user.id }}" {% if user_filter == user.id|stringformat:"s" %}selected{% endif %}>
+                            {{ user.first_name }} {{ user.last_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="btn btn-primary w-full">
+                        <i class="fas fa-filter mr-2"></i> Apply Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Attendance Records Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold">Attendance Records</h3>
+        </div>
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Staff Member</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Date</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">AM In</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">AM Out</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">PM In</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">PM Out</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in attendance_records %}
+                        <tr class="border-b">
+                            <td class="py-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="h-8 w-8 rounded-full bg-accent flex items-center justify-center">
+                                        <span class="text-sm font-medium text-white">
+                                            {{ record.user.first_name|first|upper }}{{ record.user.last_name|first|upper }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium">{{ record.user.first_name }} {{ record.user.last_name }}</p>
+                                        <p class="text-xs text-muted-foreground">{{ record.user.username }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 text-sm font-medium">{{ record.date|date:"M d, Y" }}</td>
+                            <td class="py-3 text-sm">
+                                {% if record.time_in_am %}
+                                    <span class="text-green-600">{{ record.time_in_am|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm">
+                                {% if record.time_out_am %}
+                                    <span class="text-green-600">{{ record.time_out_am|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm">
+                                {% if record.time_in_pm %}
+                                    <span class="text-green-600">{{ record.time_in_pm|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm">
+                                {% if record.time_out_pm %}
+                                    <span class="text-green-600">{{ record.time_out_pm|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if record.is_am_complete and record.is_pm_complete %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <i class="fas fa-check-circle mr-1"></i>
+                                        Complete
+                                    </span>
+                                {% elif record.is_am_complete or record.is_pm_complete %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        Partial
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        <i class="fas fa-times-circle mr-1"></i>
+                                        Absent
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-muted-foreground">
+                                <i class="fas fa-calendar-times text-4xl mb-2"></i>
+                                <p>No attendance records found</p>
+                                {% if date_from or date_to or user_filter %}
+                                <p class="text-sm">Try adjusting your filters</p>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if attendance_records.has_other_pages %}
+            <div class="flex items-center justify-between mt-6">
+                <div class="text-sm text-muted-foreground">
+                    Showing {{ attendance_records.start_index }} to {{ attendance_records.end_index }} of {{ attendance_records.paginator.count }} records
+                </div>
+                <div class="flex items-center space-x-2">
+                    {% if attendance_records.has_previous %}
+                        <a href="?page={{ attendance_records.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if user_filter %}&user={{ user_filter }}{% endif %}" 
+                           class="btn btn-outline">
+                            <i class="fas fa-chevron-left"></i>
+                            Previous
+                        </a>
+                    {% endif %}
+                    
+                    <span class="text-sm text-muted-foreground">
+                        Page {{ attendance_records.number }} of {{ attendance_records.paginator.num_pages }}
+                    </span>
+                    
+                    {% if attendance_records.has_next %}
+                        <a href="?page={{ attendance_records.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if user_filter %}&user={{ user_filter }}{% endif %}" 
+                           class="btn btn-outline">
+                            Next
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit form when filters change
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const userSelect = document.getElementById('user');
+        
+        // Auto-submit on date change
+        dateInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                this.form.submit();
+            });
+        });
+        
+        // Auto-submit on user selection
+        if (userSelect) {
+            userSelect.addEventListener('change', function() {
+                this.form.submit();
+            });
+        }
+    });
+</script>
+{% endblock %}

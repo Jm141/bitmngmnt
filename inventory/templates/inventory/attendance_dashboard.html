@@ -1,0 +1,161 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Attendance - {{ target_user.username }}{% endblock %}
+{% block page_title %}Attendance Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div class="space-y-1">
+            <h1 class="font-serif text-3xl md:text-4xl tracking-tight">
+                Attendance Dashboard
+            </h1>
+            <p class="text-muted-foreground">Track your daily attendance and working hours</p>
+        </div>
+        <div class="text-sm text-muted-foreground">
+            Today: {{ now|date:"M d, Y" }}
+        </div>
+    </div>
+
+    <!-- Today's Attendance -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold">Today's Attendance</h3>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button id="btn_time_in_am" class="btn btn-outline flex flex-col items-center p-4 h-24 {% if record_today and record_today.time_in_am %}opacity-50 cursor-not-allowed{% endif %}" {% if record_today and record_today.time_in_am %}disabled{% endif %}>
+                    <i class="fas fa-sign-in-alt text-2xl mb-2"></i>
+                    <span class="text-sm font-medium">Time In (AM)</span>
+                    {% if record_today and record_today.time_in_am %}
+                    <span class="text-xs text-muted-foreground">{{ record_today.time_in_am|date:"g:i A" }}</span>
+                    {% endif %}
+                    </button>
+                
+                <button id="btn_time_out_am" class="btn btn-outline flex flex-col items-center p-4 h-24 {% if not record_today or not record_today.time_in_am or record_today.time_out_am %}opacity-50 cursor-not-allowed{% endif %}" {% if not record_today or not record_today.time_in_am or record_today.time_out_am %}disabled{% endif %}>
+                    <i class="fas fa-sign-out-alt text-2xl mb-2"></i>
+                    <span class="text-sm font-medium">Time Out (AM)</span>
+                    {% if record_today and record_today.time_out_am %}
+                    <span class="text-xs text-muted-foreground">{{ record_today.time_out_am|date:"g:i A" }}</span>
+                    {% endif %}
+                    </button>
+                
+                <button id="btn_time_in_pm" class="btn btn-outline flex flex-col items-center p-4 h-24 {% if record_today and record_today.time_in_pm %}opacity-50 cursor-not-allowed{% endif %}" {% if record_today and record_today.time_in_pm %}disabled{% endif %}>
+                    <i class="fas fa-sign-in-alt text-2xl mb-2"></i>
+                    <span class="text-sm font-medium">Time In (PM)</span>
+                    {% if record_today and record_today.time_in_pm %}
+                    <span class="text-xs text-muted-foreground">{{ record_today.time_in_pm|date:"g:i A" }}</span>
+                    {% endif %}
+                    </button>
+                
+                <button id="btn_time_out_pm" class="btn btn-outline flex flex-col items-center p-4 h-24 {% if not record_today or not record_today.time_in_pm or record_today.time_out_pm %}opacity-50 cursor-not-allowed{% endif %}" {% if not record_today or not record_today.time_in_pm or record_today.time_out_pm %}disabled{% endif %}>
+                    <i class="fas fa-sign-out-alt text-2xl mb-2"></i>
+                    <span class="text-sm font-medium">Time Out (PM)</span>
+                    {% if record_today and record_today.time_out_pm %}
+                    <span class="text-xs text-muted-foreground">{{ record_today.time_out_pm|date:"g:i A" }}</span>
+                    {% endif %}
+                    </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance History -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold">Attendance History (Last 30 Days)</h3>
+        </div>
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Date</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">AM In</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">AM Out</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">PM In</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">PM Out</th>
+                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in records %}
+                        <tr class="border-b">
+                            <td class="py-3 text-sm font-medium">{{ rec.date|date:"M d, Y" }}</td>
+                            <td class="py-3 text-sm">
+                                {% if rec.time_in_am %}
+                                    <span class="text-green-600">{{ rec.time_in_am|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm">
+                                {% if rec.time_out_am %}
+                                    <span class="text-green-600">{{ rec.time_out_am|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm">
+                                {% if rec.time_in_pm %}
+                                    <span class="text-green-600">{{ rec.time_in_pm|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm">
+                                {% if rec.time_out_pm %}
+                                    <span class="text-green-600">{{ rec.time_out_pm|date:"g:i A" }}</span>
+                                {% else %}
+                                    <span class="text-muted-foreground">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if rec.is_am_complete and rec.is_pm_complete %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Complete
+                                    </span>
+                                {% elif rec.is_am_complete or rec.is_pm_complete %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        Partial
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        Absent
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-muted-foreground">
+                                <i class="fas fa-calendar-times text-4xl mb-2"></i>
+                                <p>No attendance records found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+    function post(action){
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        fetch('{% url "inventory:clock_event" %}', { method: 'POST', body: formData })
+        .then(r => r.json()).then(data => { if(data.success){ location.reload(); } else { alert(data.error || 'Error'); } });
+    }
+    var b1=document.getElementById('btn_time_in_am'); if(b1){ b1.addEventListener('click', function(){ post('time_in_am'); }); }
+    var b2=document.getElementById('btn_time_out_am'); if(b2){ b2.addEventListener('click', function(){ post('time_out_am'); }); }
+    var b3=document.getElementById('btn_time_in_pm'); if(b3){ b3.addEventListener('click', function(){ post('time_in_pm'); }); }
+    var b4=document.getElementById('btn_time_out_pm'); if(b4){ b4.addEventListener('click', function(){ post('time_out_pm'); }); }
+})();
+</script>
+{% endblock %}

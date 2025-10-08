@@ -1,0 +1,64 @@
+BIT Sys (Bakery Inventory Tracking System) - Ordered Implementation Checklist
+
+0. Foundation
+0.1 Configure settings: timezone Asia/Manila, email backend, LOGOUT_REDIRECT_URL, STATIC settings
+0.2 Create base roles/permissions (Super Admin, Admin, Staff) and seed a Super Admin
+0.3 Global UI shell: navbar, messages, auth guards
+
+1. Inventory Masters
+1.1 Item master (ingredients/products): code, name, category, unit, reorder_level, min_order_qty, is_perishable, shelf_life_days
+1.2 Supplier master: name, contact, address
+1.3 Units and conversions (kg<->g, L<->mL) - optional v1.1
+
+2. Stock Lots and Movements
+2.1 StockLot model: item, lot_no, qty, unit, received_at, expires_at, unit_cost
+2.2 StockMovement model: item, lot(optional), type(receive/consume/produce/adjust), qty, unit, ref_no, reason, notes, created_by, timestamp
+2.3 Services: FEFO selector for perishables, FIFO fallback
+2.4 Constraints: prevent negative stock (configurable), audit every movement
+
+3. Recipes/BOM and Production
+3.1 Recipe model (product, yield_qty, unit) and RecipeItem (ingredient, qty, unit, loss_factor%)
+3.2 Produce flow: choose product + quantity -> compute required ingredients -> validate stock -> deduct lots FEFO -> create movement entries -> add produced stock lot
+3.3 Costing: moving average cost per item; compute product batch cost from BOM (optional v1.1)
+
+4. Core Workflows (CRUD + Forms + Views)
+4.1 Receive stock (purchase/receive): choose supplier, attach lot, qty, expiry, unit cost
+4.2 Consume stock (direct use): pick item, qty, reason (maintenance/test) - FEFO
+4.3 Produce stock (via recipe): as in 3.2
+4.4 Adjust stock: increase/decrease with reason codes (damage, count variance)
+
+5. Alerts and Notifications
+5.1 Low-stock thresholds per item: trigger on movement save
+5.2 Expiry alerts: lead time configurable (e.g., 7/14 days); nightly job or on-request compute
+5.3 UI: dashboard cards + bell list; optional email notifications
+
+6. Reporting
+6.1 Stock on hand report (by item, by lot)
+6.2 Stock movement report (date range, type, user)
+6.3 Low-stock report
+6.4 Expiring/expired report
+6.5 Consumption and production summaries
+6.6 CSV export for all reports
+
+7. Access Control and Security
+7.1 Permission matrix enforced server-side for every endpoint
+7.2 Bulk permission UI (completed) with Super Admin restrictions
+7.3 Input validation/sanitization on all new forms (reuse helpers)
+7.4 Session security: password change/reset, lockout policy (basic)
+
+8. Dashboard and UX
+8.1 Dashboard KPIs: low-stock count, expiring soon, today's receipts/consumptions/productions, wastage
+8.2 Global search & filters, pagination, mobile-friendly forms
+
+9. Data Import/Initiation
+9.1 CSV import: items, initial stock lots, suppliers
+9.2 Sample seed data for demo
+
+10. Documentation (for study submission)
+10.1 ERD + data dictionary
+10.2 Use case diagrams/flows (Receive, Produce, Consume, Adjust)
+10.3 Permission matrix table
+10.4 Test plan with screenshots
+10.5 Install/run guide and user manual
+
+- Recommended Build Order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10

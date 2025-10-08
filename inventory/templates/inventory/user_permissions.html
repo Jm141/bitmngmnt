@@ -1,0 +1,153 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}User Permissions - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>
+                    <i class="fas fa-key"></i> Manage Permissions
+                    <small class="text-muted">for {{ user.username }}</small>
+                </h1>
+                <a href="{% url 'inventory:user_detail' user.id %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to User
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Current Permissions -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle"></i> Current Permissions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if current_permissions %}
+                        <div class="row">
+                            {% for permission in current_permissions %}
+                                <div class="col-12 mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ permission.get_permission_type_display }}</strong>
+                                            <br><small class="text-muted">
+                                                Granted by {{ permission.granted_by.username }} 
+                                                on {{ permission.granted_at|date:"M d, Y" }}
+                                            </small>
+                                            {% if permission.expires_at %}
+                                                <br><small class="text-warning">
+                                                    <i class="fas fa-clock"></i> Expires {{ permission.expires_at|date:"M d, Y" }}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                        <form method="post" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="permission_type" value="{{ permission.permission_type }}">
+                                            <input type="hidden" name="action" value="revoke">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="return confirm('Are you sure you want to revoke this permission?')">
+                                                <i class="fas fa-times"></i> Revoke
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No permissions assigned.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Permissions (Bulk) -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus-circle"></i> Grant New Permissions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="bulk_update" value="1">
+                        <div class="row">
+                            {% for permission_type, permission_label in available_permissions %}
+                                <div class="col-12 mb-2">
+                                    <div class="form-check d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <input class="form-check-input" type="checkbox" id="perm_{{ permission_type }}" name="permissions" value="{{ permission_type }}" {% if permission_type in current_permission_types %}checked{% endif %} {% if permission_type in 'user_write,user_delete' and not can_grant_admin_permissions %}disabled{% endif %}>
+                                            <label class="form-check-label ms-2" for="perm_{{ permission_type }}">
+                                                <strong>{{ permission_label }}</strong>
+                                                {% if permission_type in 'user_write,user_delete' and not can_grant_admin_permissions %}
+                                                    <small class="text-warning ms-1"><i class="fas fa-lock"></i> Requires Super Admin</small>
+                                                {% endif %}
+                                            </label>
+                                        </div>
+                                        {% if permission_type in current_permission_types %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-3 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-outline-light text-primary border-primary">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permission Information -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> Permission Types
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-boxes text-primary"></i> Inventory Permissions</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Read Inventory:</strong> View inventory items</li>
+                                <li><strong>Write Inventory:</strong> Add/edit inventory items</li>
+                                <li><strong>Delete Inventory:</strong> Remove inventory items</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-users text-info"></i> User Permissions</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Read Users:</strong> View user information</li>
+                                <li><strong>Write Users:</strong> Create/edit users <small class="text-warning">(Super Admin only)</small></li>
+                                <li><strong>Delete Users:</strong> Remove users <small class="text-warning">(Super Admin only)</small></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-chart-bar text-success"></i> System Permissions</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Read Reports:</strong> View system reports</li>
+                                <li><strong>Write Reports:</strong> Generate reports</li>
+                                <li><strong>Read Settings:</strong> View system settings</li>
+                                <li><strong>Write Settings:</strong> Modify settings</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,208 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Audit Logs - Inventory Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>
+                    <i class="fas fa-clipboard-list"></i> Audit Logs
+                    <small class="text-muted">System Activity Tracking</small>
+                </h1>
+                <a href="{% url 'inventory:dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="user" class="form-label">Filter by User</label>
+                            <input type="text" class="form-control" id="user" name="user" 
+                                   value="{{ user_filter }}" placeholder="Search by username...">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="action" class="form-label">Action Type</label>
+                            <select class="form-select" id="action" name="action">
+                                <option value="">All Actions</option>
+                                {% for value, label in action_choices %}
+                                    <option value="{{ value }}" {% if action_filter == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-outline-primary me-2">
+                                <i class="fas fa-search"></i> Filter
+                            </button>
+                            <a href="{% url 'inventory:audit_logs' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Logs Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list"></i> System Activity Log
+                        <span class="badge bg-secondary ms-2">{{ logs.paginator.count }} total entries</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if logs %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>Action</th>
+                                        <th>Target</th>
+                                        <th>Description</th>
+                                        <th>IP Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for log in logs %}
+                                        <tr>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ log.timestamp|date:"M d, Y" }}<br>
+                                                    {{ log.timestamp|time:"H:i:s" }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if log.user %}
+                                                    <strong>{{ log.user.username }}</strong>
+                                                    <br><small class="text-muted">{{ log.user.get_role_display }}</small>
+                                                {% else %}
+                                                    <span class="text-muted">System</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{% if log.action_type == 'create' %}success{% elif log.action_type == 'update' %}warning{% elif log.action_type == 'delete' %}danger{% elif log.action_type == 'login' %}info{% elif log.action_type == 'logout' %}secondary{% else %}primary{% endif %}">
+                                                    {{ log.get_action_type_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong>{{ log.target_model }}</strong>
+                                                {% if log.target_id %}
+                                                    <br><small class="text-muted">ID: {{ log.target_id }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="text-muted">{{ log.description }}</span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">{{ log.ip_address }}</small>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if logs.has_other_pages %}
+                            <nav aria-label="Audit logs pagination">
+                                <ul class="pagination justify-content-center">
+                                    {% if logs.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1{% if user_filter %}&user={{ user_filter }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ logs.previous_page_number }}{% if user_filter %}&user={{ user_filter }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}">
+                                                <i class="fas fa-angle-left"></i>
+                                            </a>
+                                        </li>
+                                    {% endif %}
+
+                                    <li class="page-item active">
+                                        <span class="page-link">
+                                            Page {{ logs.number }} of {{ logs.paginator.num_pages }}
+                                        </span>
+                                    </li>
+
+                                    {% if logs.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ logs.next_page_number }}{% if user_filter %}&user={{ user_filter }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}">
+                                                <i class="fas fa-angle-right"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ logs.paginator.num_pages }}{% if user_filter %}&user={{ user_filter }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No audit logs found</h5>
+                            <p class="text-muted">No system activities have been recorded yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Log Information -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> About Audit Logs
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>What is tracked?</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> User login/logout activities</li>
+                                <li><i class="fas fa-check text-success"></i> User creation, updates, and deletions</li>
+                                <li><i class="fas fa-check text-success"></i> Permission grants and revocations</li>
+                                <li><i class="fas fa-check text-success"></i> All CRUD operations</li>
+                                <li><i class="fas fa-check text-success"></i> System access and navigation</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Security Information</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-shield-alt text-info"></i> IP addresses are logged for security</li>
+                                <li><i class="fas fa-shield-alt text-info"></i> User agents are tracked</li>
+                                <li><i class="fas fa-shield-alt text-info"></i> Timestamps are precise to the second</li>
+                                <li><i class="fas fa-shield-alt text-info"></i> All actions are immutable</li>
+                                <li><i class="fas fa-shield-alt text-info"></i> Only Super Admin can view logs</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
