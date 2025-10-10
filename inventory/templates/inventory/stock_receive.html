@@ -40,7 +40,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" style="display:none;">
                                 <div class="form-group">
                                     <label for="{{ form.lot_no.id_for_label }}">{{ form.lot_no.label }}</label>
                                     {{ form.lot_no }}
@@ -51,6 +51,14 @@
                                             {% endfor %}
                                         </div>
                                     {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="alert alert-light small" id="current-stock-display" role="status" aria-live="polite">
+                                    Current stock: <strong id="current-stock-value">-</strong>
                                 </div>
                             </div>
                         </div>
@@ -202,23 +210,77 @@
 document.addEventListener('DOMContentLoaded', function() {
     const itemSelect = document.getElementById('{{ form.item.id_for_label }}');
     const expiryField = document.getElementById('{{ form.expires_at.id_for_label }}');
-    
-    function updateExpiryField() {
-        const selectedOption = itemSelect.options[itemSelect.selectedIndex];
-        const itemData = selectedOption.dataset;
-        
-        if (itemData.perishable === 'true') {
-            expiryField.required = true;
-            expiryField.disabled = false;
-        } else {
-            expiryField.required = false;
-            expiryField.disabled = true;
-            expiryField.value = '';
+
+    async function fetchItemMeta(itemId) {
+        if (!itemId) return null;
+        try {
+            const resp = await fetch(`{% url 'inventory:api_item_meta' %}?item_id=${itemId}`);
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            console.log('[receive] api_item_meta response for', itemId, data);
+            return data;
+        } catch (err) {
+            console.error('Failed to fetch item metadata', err);
+            return null;
         }
     }
-    
-    itemSelect.addEventListener('change', updateExpiryField);
-    updateExpiryField(); // Initial call
+
+    async function updateExpiryFieldAndUnit() {
+        if (!expiryField) return;
+        const itemId = itemSelect ? itemSelect.value : null;
+        const meta = await fetchItemMeta(itemId);
+        // Unit auto-populate
+        const unitSelect = document.getElementById('{{ form.unit.id_for_label }}');
+        if (unitSelect && meta && meta.unit) {
+            // First try to match by option value (expected: 'kg', 'pcs', etc.)
+            let matched = false;
+            for (const opt of unitSelect.options) {
+                if (opt.value === meta.unit) {
+                    unitSelect.value = opt.value;
+                    matched = true;
+                    break;
+                }
+            }
+
+            // If not matched, try matching by option text (in case API returned display label)
+            if (!matched) {
+                for (const opt of unitSelect.options) {
+                    if (opt.text.trim().toLowerCase() === String(meta.unit).trim().toLowerCase()) {
+                        unitSelect.value = opt.value;
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+
+            // If matched, dispatch change to let any listeners react
+            console.log('[receive] unit match found?', matched, 'setting to', unitSelect.value);
+            if (matched) {
+                unitSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Expiry handling: enable for perishable, otherwise clear and make optional
+        if (meta && meta.is_perishable) {
+            expiryField.required = true;
+            expiryField.removeAttribute('disabled');
+            expiryField.classList.remove('disabled');
+        } else {
+            expiryField.required = false;
+            expiryField.setAttribute('disabled', 'disabled');
+            expiryField.value = '';
+            expiryField.classList.add('disabled');
+        }
+
+        // Update current stock display
+        const currentStockEl = document.getElementById('current-stock-value');
+        if (currentStockEl) {
+            currentStockEl.textContent = (meta && (meta.current_stock !== undefined)) ? meta.current_stock : '-';
+        }
+    }
+
+    itemSelect && itemSelect.addEventListener('change', updateExpiryFieldAndUnit);
+    updateExpiryFieldAndUnit();
 });
 </script>
 {% endblock %}

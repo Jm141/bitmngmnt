@@ -15,11 +15,13 @@ from .models import User, UserLinks, UserAccess, AuditLog, AttendanceRecord, Shi
 from .security import (
     role_required, permission_required, super_admin_required, admin_required,
     log_user_action, validate_user_input, sanitize_input, can_manage_user,
-    get_user_permissions, check_user_permissions
+    get_user_permissions, check_user_permissions, get_manila_now
 )
 from .forms import UserForm, UserAccessForm, UserLinksForm, SupplierForm, ItemForm, StockLotForm, StockMovementForm, RecipeForm, RecipeItemForm, StockReceiveForm, StockConsumeForm, ProductionForm
 from .services import InventoryService, RecipeService
 import json
+from django.http import HttpResponseBadRequest
+from django.core.serializers.json import DjangoJSONEncoder
 
 
 @login_required
@@ -59,7 +61,7 @@ def attendance_dashboard(request):
         'target_user': target_user,
         'records': records,
         'record_today': record_today,
-        'now': timezone.now(),
+        'now': get_manila_now(),
     }
     return render(request, 'inventory/attendance_dashboard.html', context)
 
@@ -72,7 +74,8 @@ def clock_event(request):
         return JsonResponse({'error': 'Unauthorized'}, status=403)
 
     action = request.POST.get('action')  # time_in_am, time_out_am, time_in_pm, time_out_pm
-    now_dt = timezone.now()
+    # Use Manila-aware current time to determine "today" and record timestamps
+    now_dt = get_manila_now()
     today = now_dt.date()
     record, _ = AttendanceRecord.objects.get_or_create(user=request.user, date=today)
 
@@ -558,7 +561,7 @@ def admin_attendance_overview(request):
     
     # Get summary statistics
     total_records = AttendanceRecord.objects.count()
-    today_records = AttendanceRecord.objects.filter(date=timezone.now().date()).count()
+    today_records = AttendanceRecord.objects.filter(date=get_manila_now().date()).count()
     active_staff = staff_users.count()
     
     context = {
@@ -885,9 +888,17 @@ def stock_receive(request):
         form = StockReceiveForm(request.POST)
         if form.is_valid():
             try:
+                lot_no = form.cleaned_data.get('lot_no')
+                # Auto-generate lot number if not provided
+                if not lot_no:
+                    import datetime
+                    item = form.cleaned_data['item']
+                    now_str = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+                    lot_no = f"LOT-{item.code}-{now_str}"
+
                 lot = InventoryService.receive_stock(
                     item=form.cleaned_data['item'],
-                    lot_no=form.cleaned_data['lot_no'],
+                    lot_no=lot_no,
                     qty=form.cleaned_data['qty'],
                     unit=form.cleaned_data['unit'],
                     user=request.user,
@@ -921,6 +932,58 @@ def stock_receive(request):
     }
     
     return render(request, 'inventory/stock_receive.html', context)
+
+
+@login_required
+def api_item_lots(request):
+    """Return available lots for an item ordered by FEFO/FIFO as JSON."""
+    item_id = request.GET.get('item_id')
+    if not item_id:
+        return HttpResponseBadRequest('item_id required')
+
+    try:
+        from .models import Item
+        item = Item.objects.get(id=item_id)
+    except Exception:
+        return HttpResponseBadRequest('invalid item_id')
+
+    lots = InventoryService.get_available_lots(item)
+    data = []
+    for lot in lots:
+        data.append({
+            'id': str(lot.id),
+            'lot_no': lot.lot_no,
+            'qty': str(lot.qty),
+            'unit': lot.unit,
+            'expires_at': lot.expires_at.isoformat() if lot.expires_at else None,
+        })
+
+    return JsonResponse(data, safe=False, encoder=DjangoJSONEncoder)
+
+
+@login_required
+def api_item_meta(request):
+    """Return metadata for an item (is_perishable, unit, shelf_life_days) as JSON."""
+    item_id = request.GET.get('item_id')
+    if not item_id:
+        return HttpResponseBadRequest('item_id required')
+
+    try:
+        from .models import Item
+        item = Item.objects.get(id=item_id)
+    except Exception:
+        return HttpResponseBadRequest('invalid item_id')
+
+    data = {
+        'is_perishable': item.is_perishable,
+        'unit': item.unit,
+        'shelf_life_days': item.shelf_life_days,
+        'code': item.code,
+        'name': item.name,
+        'current_stock': item.get_current_stock(),
+    }
+
+    return JsonResponse(data, encoder=DjangoJSONEncoder)
 
 
 @login_required

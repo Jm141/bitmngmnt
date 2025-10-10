@@ -45,6 +45,8 @@ urlpatterns = [
     # Stock Operations
     path('stock/receive/', views.stock_receive, name='stock_receive'),
     path('stock/consume/', views.stock_consume, name='stock_consume'),
+    path('api/item-lots/', views.api_item_lots, name='api_item_lots'),
+    path('api/item-meta/', views.api_item_meta, name='api_item_meta'),
     path('production/', views.production_create, name='production_create'),
     
     # Suppliers

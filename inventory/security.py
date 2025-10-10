@@ -10,6 +10,12 @@ from django.views.generic import View
 from functools import wraps
 import logging
 from .models import User, UserAccess, AuditLog
+from django.utils import timezone
+try:
+    # Prefer zoneinfo from stdlib (Python 3.9+)
+    from zoneinfo import ZoneInfo
+except Exception:
+    ZoneInfo = None
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +194,21 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+def get_manila_now():
+    """
+    Return current timezone-aware datetime in Asia/Manila.
+    Uses zoneinfo if available, otherwise falls back to Django timezone's now().
+    """
+    now = timezone.now()
+    if ZoneInfo is not None:
+        try:
+            return now.astimezone(ZoneInfo('Asia/Manila'))
+        except Exception:
+            return now
+    # Fallback: return Django-aware now (may use settings.TIME_ZONE)
+    return now
 
 
 def check_user_permissions(user, permission_type):

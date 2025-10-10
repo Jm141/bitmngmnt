@@ -227,18 +227,36 @@
 document.addEventListener('DOMContentLoaded', function() {
     const perishableCheckbox = document.getElementById('{{ form.is_perishable.id_for_label }}');
     const shelfLifeField = document.getElementById('{{ form.shelf_life_days.id_for_label }}');
-    
+
     function toggleShelfLife() {
         if (perishableCheckbox.checked) {
+            // Perishable checked: require shelf life
             shelfLifeField.disabled = false;
             shelfLifeField.required = true;
+            if (!shelfLifeField.value || shelfLifeField.value == '0') {
+                shelfLifeField.value = '';
+            }
         } else {
-            shelfLifeField.disabled = true;
+            // Perishable unchecked: shelf life optional. Keep field editable so user
+            // can type a positive value which will auto-check Perishable.
+            shelfLifeField.disabled = false;
             shelfLifeField.required = false;
-            shelfLifeField.value = 0;
+            if (!shelfLifeField.value) {
+                shelfLifeField.value = 0;
+            }
         }
     }
-    
+
+    // If user types a shelf life > 0 we auto-check the perishable box
+    shelfLifeField.addEventListener('input', function() {
+        const val = parseInt(shelfLifeField.value || '0', 10);
+        if (val > 0 && !perishableCheckbox.checked) {
+            perishableCheckbox.checked = true;
+            toggleShelfLife();
+        }
+        // If user clears to 0, don't auto-uncheck perishable (prevent accidental loss)
+    });
+
     perishableCheckbox.addEventListener('change', toggleShelfLife);
     toggleShelfLife(); // Initial call
 });

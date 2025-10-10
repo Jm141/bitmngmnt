@@ -1,0 +1,134 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ item.code }} - {{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">{{ item.code }} — {{ item.name }}</h1>
+            <div>
+                <a href="{% url 'inventory:item_update' item.id %}" class="btn btn-warning mr-2"><i class="fas fa-edit"></i> Edit</a>
+                <a href="{% url 'inventory:stock_receive' %}" class="btn btn-success"><i class="fas fa-plus"></i> Receive Stock</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Item Details</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Code</dt>
+                        <dd class="col-sm-9">{{ item.code }}</dd>
+
+                        <dt class="col-sm-3">Name</dt>
+                        <dd class="col-sm-9">{{ item.name }}</dd>
+
+                        <dt class="col-sm-3">Category</dt>
+                        <dd class="col-sm-9">{{ item.get_category_display }}</dd>
+
+                        <dt class="col-sm-3">Unit</dt>
+                        <dd class="col-sm-9">{{ item.get_unit_display }}</dd>
+
+                        <dt class="col-sm-3">Current Stock</dt>
+                        <dd class="col-sm-9">{{ current_stock }}</dd>
+
+                        <dt class="col-sm-3">Reorder Level</dt>
+                        <dd class="col-sm-9">{{ item.reorder_level }}</dd>
+
+                        <dt class="col-sm-3">Perishable</dt>
+                        <dd class="col-sm-9">{% if item.is_perishable %}Yes ({{ item.shelf_life_days }} days){% else %}No{% endif %}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Stock Lots</h6>
+                </div>
+                <div class="card-body">
+                    {% if stock_lots %}
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Lot No</th>
+                                    <th>Qty</th>
+                                    <th>Unit</th>
+                                    <th>Received At</th>
+                                    <th>Expires At</th>
+                                    <th>Supplier</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lot in stock_lots %}
+                                <tr>
+                                    <td>{{ lot.lot_no }}</td>
+                                    <td>{{ lot.qty }}</td>
+                                    <td>{{ lot.unit }}</td>
+                                    <td>{{ lot.received_at }}</td>
+                                    <td>{{ lot.expires_at|default:'-' }}</td>
+                                    <td>
+                                        {% if lot.supplier %}
+                                            {{ lot.supplier.name }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                        <p class="text-muted">No stock lots for this item yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">Recent Movements</h6>
+                </div>
+                <div class="card-body">
+                    {% if movements %}
+                    <ul class="list-group">
+                        {% for m in movements %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ m.get_movement_type_display }}</strong> — {{ m.qty }} {{ m.unit }}
+                                <div class="small text-muted">{{ m.timestamp }} by {% if m.created_by %}{{ m.created_by.username }}{% else %}System{% endif %}</div>
+                            </div>
+                            <div class="text-right">
+                                <div>{{ m.ref_no }}</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                        <p class="text-muted">No recent movements.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Actions</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'inventory:stock_receive' %}" class="btn btn-success btn-block mb-2">Receive Stock</a>
+                    <a href="{% url 'inventory:stock_consume' %}" class="btn btn-danger btn-block mb-2">Consume Stock</a>
+                    <a href="{% url 'inventory:item_update' item.id %}" class="btn btn-warning btn-block">Edit Item</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

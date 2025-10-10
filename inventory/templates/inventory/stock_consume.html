@@ -1,0 +1,300 @@
+
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">{{ title }}</h1>
+        <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card shadow">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-danger">Consume Stock</h6>
+        </div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="{{ form.item.id_for_label }}">{{ form.item.label }}</label>
+                  {{ form.item }}
+                  {% if form.item.errors %}
+                    <div class="text-danger">
+                      {% for error in form.item.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>Current stock</label>
+                  <input type="text" class="form-control" id="consume-current-stock-input" readonly value="-">
+                </div>
+
+                <div style="display:none;" aria-hidden="true">
+                  <div class="form-group">
+                    <label for="{{ form.lot.id_for_label }}">{{ form.lot.label }}</label>
+                    {{ form.lot }}
+                    {% if form.lot.errors %}
+                      <div class="text-danger">
+                        {% for error in form.lot.errors %}
+                          <small>{{ error }}</small>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label for="{{ form.qty.id_for_label }}">{{ form.qty.label }}</label>
+                  {{ form.qty }}
+                  {% if form.qty.errors %}
+                    <div class="text-danger">
+                      {% for error in form.qty.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label for="{{ form.unit.id_for_label }}">{{ form.unit.label }}</label>
+                  {{ form.unit }}
+                  {% if form.unit.errors %}
+                    <div class="text-danger">
+                      {% for error in form.unit.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+                  {{ form.reason }}
+                  {% if form.reason.errors %}
+                    <div class="text-danger">
+                      {% for error in form.reason.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="{{ form.ref_no.id_for_label }}">{{ form.ref_no.label }}</label>
+                  {{ form.ref_no }}
+                  {% if form.ref_no.errors %}
+                    <div class="text-danger">
+                      {% for error in form.ref_no.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+              {{ form.notes }}
+              {% if form.notes.errors %}
+                <div class="text-danger">
+                  {% for error in form.notes.errors %}
+                    <small>{{ error }}</small>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  {{ error }}
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="form-group">
+              <button type="submit" class="btn btn-danger">
+                <i class="fas fa-minus-circle"></i> Consume Stock
+              </button>
+              <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-info">Help</h6>
+        </div>
+        <div class="card-body">
+          <h6>Choose Item</h6>
+          <p class="text-muted small">Select the item to consume. If you select a lot, consumption will use that lot; otherwise system will auto-select lots using FEFO/FIFO.</p>
+
+          <h6>Lot</h6>
+          <p class="text-muted small">Optional: select specific lot to consume from. Leave blank to auto-select.</p>
+
+          <h6>Quantity</h6>
+          <p class="text-muted small">Enter the quantity to consume. For outbound movements, lot availability will be validated.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const itemSelect = document.getElementById('{{ form.item.id_for_label }}');
+  const lotSelect = document.getElementById('{{ form.lot.id_for_label }}');
+  const unitSelectConsume = document.getElementById('{{ form.unit.id_for_label }}');
+  const unitSelect = document.getElementById('{{ form.unit.id_for_label }}');
+
+  // If options include data attributes (not present by default), you could use them.
+  // For now, when item changes we clear lot selection so user picks matching lots.
+  function updateLotOptions() {
+    if (!itemSelect || !lotSelect) return;
+    // Clear current lot selection
+    lotSelect.selectedIndex = 0;
+  }
+
+  itemSelect && itemSelect.addEventListener('change', updateLotOptions);
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const itemSelect = document.getElementById('{{ form.item.id_for_label }}');
+  const lotSelect = document.getElementById('{{ form.lot.id_for_label }}');
+
+  async function fetchLots(itemId) {
+    if (!itemId) return [];
+    try {
+      const resp = await fetch(`{% url 'inventory:api_item_lots' %}?item_id=${itemId}`);
+      if (!resp.ok) return [];
+      return await resp.json();
+    } catch (err) {
+      console.error('Failed to fetch lots', err);
+      return [];
+    }
+  }
+
+  async function fetchItemMeta(itemId) {
+    if (!itemId) return null;
+    try {
+      const resp = await fetch(`{% url 'inventory:api_item_meta' %}?item_id=${itemId}`);
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      console.log('[consume] api_item_meta response for', itemId, data);
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch item metadata', err);
+      return null;
+    }
+  }
+
+  async function onItemChange() {
+    if (!itemSelect || !lotSelect) return;
+    const itemId = itemSelect.value;
+    const lots = await fetchLots(itemId);
+    const meta = await fetchItemMeta(itemId);
+    // auto-set unit select if present (locally resolve element to avoid scope issues)
+    const unitSelectElement = document.getElementById('{{ form.unit.id_for_label }}');
+    if (unitSelectElement && meta && meta.unit) {
+      let matched = false;
+      for (const opt of unitSelectElement.options) {
+        if (opt.value === meta.unit) {
+          unitSelectElement.value = opt.value;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        for (const opt of unitSelectElement.options) {
+          if (opt.text.trim().toLowerCase() === String(meta.unit).trim().toLowerCase()) {
+            unitSelectElement.value = opt.value;
+            matched = true;
+            break;
+          }
+        }
+      }
+      console.log('[consume] unit match found?', matched, 'setting to', unitSelectElement.value);
+      if (matched) unitSelectElement.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Update current stock display (value + unit) with logging for debugging
+    try {
+      const input = document.getElementById('consume-current-stock-input');
+      console.log('[consume] updating current stock input', meta);
+      if (input) {
+        const val = (meta && (meta.current_stock !== undefined && meta.current_stock !== null)) ? meta.current_stock : '-';
+        const unit = (meta && meta.unit) ? ` ${meta.unit}` : '';
+        input.value = `${val}${unit}`;
+      }
+    } catch (e) {
+      console.error('[consume] failed updating current stock input', e);
+    }
+
+    // Clear existing options
+    lotSelect.innerHTML = '<option value="">-- Select Lot (optional) --</option>';
+    lots.forEach(lot => {
+      const opt = document.createElement('option');
+      opt.value = lot.id;
+      opt.textContent = `${lot.lot_no} (qty: ${lot.qty} ${lot.unit}${lot.expires_at ? ', exp: '+lot.expires_at : ''})`;
+      lotSelect.appendChild(opt);
+    });
+    // Auto-select the first lot (FEFO/FIFO top) so the UI defaults to the lot that will be used
+    if (lots.length > 0) {
+      lotSelect.selectedIndex = 1; // index 0 is the placeholder: select the first appended option
+    }
+
+    // Auto-fill ref_no on consume form (pattern: CONS-<item_code>-<timestamp>)
+    try {
+      const refField = document.getElementById('{{ form.ref_no.id_for_label }}');
+      if (refField && meta && meta.code) {
+        const ts = new Date().toISOString().replace(/[:.]/g, '').slice(0,15);
+        refField.value = `CONS-${meta.code}-${ts}`;
+      }
+    } catch (e) {
+      // no-op if ref field missing
+    }
+  }
+
+  itemSelect && itemSelect.addEventListener('change', onItemChange);
+  // Initial load if item already selected
+  if (itemSelect && itemSelect.value) onItemChange();
+});
+</script>
+
+{% endblock %}
