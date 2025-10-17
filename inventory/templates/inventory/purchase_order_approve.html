@@ -1,0 +1,165 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-check-circle me-2"></i>{{ title }}</h2>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Order
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <!-- Order Summary -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order No:</strong> {{ order.order_no }}</p>
+                            <p><strong>Supplier:</strong> {{ order.supplier.name }}</p>
+                            <p><strong>Total Amount:</strong> <span class="text-success fw-bold">₱{{ order.total_amount|floatformat:2 }}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Order Date:</strong> {{ order.order_date|date:"Y-m-d H:i" }}</p>
+                            <p><strong>Total Items:</strong> {{ order.order_items.count }}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-warning">{{ order.get_status_display }}</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item Pricing Form -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0"><i class="fas fa-dollar-sign me-2"></i>Item Pricing</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Set Your Prices:</strong> Please provide your unit prices for each item below.
+                    </div>
+                    
+                    <form method="post" id="approvalForm">
+                        {% csrf_token %}
+                        
+                        <!-- Item Prices -->
+                        <div class="table-responsive mb-4">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Quantity Requested</th>
+                                        <th>Your Unit Price *</th>
+                                        <th>Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for po_item in order_items %}
+                                        <tr>
+                                            <td><strong>{{ po_item.item.name }}</strong></td>
+                                            <td>{{ po_item.qty_ordered }} {{ po_item.get_unit_display }}</td>
+                                            <td>
+                                                {% for field in form %}
+                                                    {% if field.name == 'item_price_'|add:po_item.id|stringformat:"s" %}
+                                                        {{ field }}
+                                                        {% if field.errors %}
+                                                            <div class="text-danger small">{{ field.errors }}</div>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td class="subtotal-cell" data-qty="{{ po_item.qty_ordered }}" id="subtotal_{{ po_item.id }}">
+                                                ₱0.00
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-active">
+                                    <tr>
+                                        <td colspan="3" class="text-end"><strong>Total Order Amount:</strong></td>
+                                        <td><strong id="grandTotal">₱0.00</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Delivery Date & Notes -->
+                        <div class="mb-3">
+                            <label for="{{ form.expected_delivery_date.id_for_label }}" class="form-label">Expected Delivery Date *</label>
+                            {{ form.expected_delivery_date }}
+                            {% if form.expected_delivery_date.errors %}
+                                <div class="text-danger">{{ form.expected_delivery_date.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.expected_delivery_date.help_text }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.supplier_notes.id_for_label }}" class="form-label">Your Notes (Optional)</label>
+                            {{ form.supplier_notes }}
+                            {% if form.supplier_notes.errors %}
+                                <div class="text-danger">{{ form.supplier_notes.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.supplier_notes.help_text }}</div>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check me-2"></i>Approve Order with Pricing
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+<script>
+// Calculate subtotals when prices are entered
+document.addEventListener('DOMContentLoaded', function() {
+    const priceInputs = document.querySelectorAll('input[name^="item_price_"]');
+    
+    priceInputs.forEach(input => {
+        input.addEventListener('input', calculateTotals);
+    });
+    
+    calculateTotals(); // Initial calculation
+});
+
+function calculateTotals() {
+    let grandTotal = 0;
+    
+    document.querySelectorAll('.subtotal-cell').forEach(cell => {
+        const itemId = cell.id.replace('subtotal_', '');
+        const priceInput = document.querySelector(`input[name="item_price_${itemId}"]`);
+        const qty = parseFloat(cell.dataset.qty) || 0;
+        const price = parseFloat(priceInput?.value) || 0;
+        const subtotal = qty * price;
+        
+        cell.textContent = '₱' + subtotal.toFixed(2);
+        grandTotal += subtotal;
+    });
+    
+    document.getElementById('grandTotal').textContent = '₱' + grandTotal.toFixed(2);
+}
+</script>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

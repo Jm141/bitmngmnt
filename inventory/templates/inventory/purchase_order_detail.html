@@ -1,0 +1,293 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Purchase Order {{ order.order_no }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-shopping-cart me-2"></i>Purchase Order: {{ order.order_no }}</h2>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:purchase_order_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to List
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Order Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order No:</strong> {{ order.order_no }}</p>
+                            <p><strong>Supplier:</strong> {{ order.supplier.name }}</p>
+                            <p><strong>Status:</strong> 
+                                {% if order.status == 'draft' %}
+                                    <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'pending' %}
+                                    <span class="badge bg-warning">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'approved' %}
+                                    <span class="badge bg-info">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'shipped' %}
+                                    <span class="badge bg-primary">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'received' %}
+                                    <span class="badge bg-success">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">{{ order.get_status_display }}</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Created By:</strong> {{ order.created_by.get_full_name }}</p>
+                            <p><strong>Order Date:</strong> {{ order.order_date|date:"Y-m-d H:i" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Expected Delivery:</strong> 
+                                {% if order.expected_delivery_date %}
+                                    {{ order.expected_delivery_date|date:"Y-m-d" }}
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Actual Delivery:</strong> 
+                                {% if order.actual_delivery_date %}
+                                    {{ order.actual_delivery_date|date:"Y-m-d" }}
+                                {% else %}
+                                    <span class="text-muted">Not delivered</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Total Amount:</strong> <span class="text-success fw-bold">₱{{ order.total_amount|floatformat:2 }}</span></p>
+                            {% if order.received_by %}
+                                <p><strong>Received By:</strong> {{ order.received_by.get_full_name }}</p>
+                                <p><strong>Received At:</strong> {{ order.received_at|date:"Y-m-d H:i" }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if order.notes %}
+                        <hr>
+                        <p><strong>Notes:</strong></p>
+                        <p>{{ order.notes }}</p>
+                    {% endif %}
+                    {% if order.supplier_notes %}
+                        <hr>
+                        <p><strong>Supplier Notes:</strong></p>
+                        <p>{{ order.supplier_notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Qty Ordered</th>
+                                    <th>Unit</th>
+                                    <th>Unit Price</th>
+                                    <th>Subtotal</th>
+                                    <th>Qty Received</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order_items %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'inventory:item_detail' item.item.id %}">
+                                                {{ item.item.name }}
+                                            </a>
+                                        </td>
+                                        <td>{{ item.qty_ordered }}</td>
+                                        <td>{{ item.get_unit_display }}</td>
+                                        <td>₱{{ item.unit_price|floatformat:2 }}</td>
+                                        <td>₱{{ item.subtotal|floatformat:2 }}</td>
+                                        <td>
+                                            {% if item.is_fully_received %}
+                                                <span class="badge bg-success">{{ item.qty_received }}</span>
+                                            {% elif item.qty_received > 0 %}
+                                                <span class="badge bg-warning">{{ item.qty_received }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">0</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-active">
+                                    <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                    <td colspan="2"><strong>₱{{ order.total_amount|floatformat:2 }}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code & Actions -->
+        <div class="col-md-4">
+            <!-- QR Code -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ qr_code_image }}" alt="QR Code" class="img-fluid mb-3" style="max-width: 250px;">
+                    <p class="small text-muted mb-2">Scan this QR code to receive the order</p>
+                    <p class="small"><code>{{ order.qr_code }}</code></p>
+                    <button onclick="window.print()" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-print me-2"></i>Print QR Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.status == 'pending' %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Waiting for Supplier</strong><br>
+                            This order is pending supplier approval and pricing.
+                            The supplier will provide pricing and delivery date.
+                        </div>
+                    {% endif %}
+
+                    {% if order.can_be_received %}
+                        <a href="{% url 'inventory:purchase_order_scan_receive' %}" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-qrcode me-2"></i>Scan to Receive
+                        </a>
+                    {% endif %}
+
+                    {% if order.status != 'received' and order.status != 'cancelled' %}
+                        <form method="post" action="{% url 'inventory:purchase_order_cancel' order.id %}" class="mb-2" onsubmit="return confirm('Are you sure you want to cancel this purchase order?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger w-100">
+                                <i class="fas fa-times me-2"></i>Cancel Order
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    {% if order.status == 'approved' or order.status == 'shipped' %}
+                        <div class="alert alert-success mt-2">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Supplier Approved</strong><br>
+                            Total: ₱{{ order.total_amount|floatformat:2 }}<br>
+                            Delivery: {{ order.expected_delivery_date|date:"Y-m-d" }}
+                        </div>
+                    {% endif %}
+
+                    {% if order.status == 'received' %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-box-open me-2"></i>
+                            <strong>Order Completed</strong><br>
+                            Received: {{ order.received_at|date:"Y-m-d H:i" }}<br>
+                            By: {{ order.received_by.get_full_name }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="timeline">
+                        <li class="timeline-item">
+                            <i class="fas fa-plus-circle text-primary"></i>
+                            <span><strong>Created</strong></span>
+                            <small class="text-muted d-block">{{ order.order_date|date:"Y-m-d H:i" }}</small>
+                        </li>
+                        {% if order.approved_at %}
+                            <li class="timeline-item">
+                                <i class="fas fa-check-circle text-success"></i>
+                                <span><strong>Approved</strong></span>
+                                <small class="text-muted d-block">{{ order.approved_at|date:"Y-m-d H:i" }}</small>
+                            </li>
+                        {% endif %}
+                        {% if order.shipped_at %}
+                            <li class="timeline-item">
+                                <i class="fas fa-shipping-fast text-info"></i>
+                                <span><strong>Shipped</strong></span>
+                                <small class="text-muted d-block">{{ order.shipped_at|date:"Y-m-d H:i" }}</small>
+                            </li>
+                        {% endif %}
+                        {% if order.received_at %}
+                            <li class="timeline-item">
+                                <i class="fas fa-box-open text-success"></i>
+                                <span><strong>Received</strong></span>
+                                <small class="text-muted d-block">{{ order.received_at|date:"Y-m-d H:i" }}</small>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    list-style: none;
+    padding: 0;
+    position: relative;
+}
+
+.timeline-item {
+    padding-left: 35px;
+    padding-bottom: 20px;
+    position: relative;
+}
+
+.timeline-item:before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 20px;
+    height: calc(100% - 10px);
+    border-left: 2px solid #dee2e6;
+}
+
+.timeline-item:last-child:before {
+    display: none;
+}
+
+.timeline-item i {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-size: 18px;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .card:has(.fa-qrcode) * {
+        visibility: visible;
+    }
+    .card:has(.fa-qrcode) {
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+}
+</style>
+{% endblock %}
+

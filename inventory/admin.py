@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import User, UserLinks, UserAccess, AuditLog, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem
+from .models import User, UserLinks, UserAccess, AuditLog, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem, PurchaseOrder, PurchaseOrderItem
 
 
 @admin.register(User)
@@ -247,3 +247,66 @@ class RecipeItemAdmin(admin.ModelAdmin):
         ('Loss Factor', {'fields': ('loss_factor',)}),
         ('Notes', {'fields': ('notes',)}),
     )
+
+
+# --- PURCHASE ORDER ADMIN ---
+
+class PurchaseOrderItemInline(admin.TabularInline):
+    """
+    Inline admin for PurchaseOrderItem
+    """
+    model = PurchaseOrderItem
+    extra = 1
+    fields = ('item', 'qty_ordered', 'unit_price', 'qty_received', 'notes')
+    readonly_fields = ('qty_received',)
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    """
+    Admin for Purchase Order management
+    """
+    list_display = ('order_no', 'supplier', 'status', 'total_amount', 'order_date', 'expected_delivery_date', 'created_by')
+    list_filter = ('status', 'supplier', 'order_date', 'expected_delivery_date')
+    search_fields = ('order_no', 'supplier__name', 'qr_code')
+    ordering = ('-created_at',)
+    inlines = [PurchaseOrderItemInline]
+    
+    fieldsets = (
+        ('Order Information', {'fields': ('order_no', 'supplier', 'status', 'qr_code')}),
+        ('Dates', {'fields': ('order_date', 'expected_delivery_date', 'actual_delivery_date')}),
+        ('Supplier Response', {'fields': ('supplier_notes', 'approved_at', 'shipped_at', 'received_at')}),
+        ('Internal', {'fields': ('notes', 'total_amount', 'received_by')}),
+        ('Metadata', {'fields': ('created_at', 'updated_at', 'created_by')}),
+    )
+    
+    readonly_fields = ('order_no', 'qr_code', 'order_date', 'approved_at', 'shipped_at', 'received_at', 'created_at', 'updated_at')
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Creating new purchase order
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(PurchaseOrderItem)
+class PurchaseOrderItemAdmin(admin.ModelAdmin):
+    """
+    Admin for PurchaseOrderItem management
+    """
+    list_display = ('purchase_order', 'item', 'qty_ordered', 'unit_price', 'qty_received', 'subtotal_display')
+    list_filter = ('purchase_order__status', 'item__category')
+    search_fields = ('purchase_order__order_no', 'item__code', 'item__name')
+    ordering = ('-purchase_order__created_at', 'item')
+    
+    fieldsets = (
+        ('Order', {'fields': ('purchase_order', 'item')}),
+        ('Quantities', {'fields': ('qty_ordered', 'unit', 'qty_received')}),
+        ('Pricing', {'fields': ('unit_price',)}),
+        ('Notes', {'fields': ('notes',)}),
+    )
+    
+    readonly_fields = ('qty_received',)
+    
+    def subtotal_display(self, obj):
+        return f"₱{obj.subtotal():,.2f}"
+    subtotal_display.short_description = 'Subtotal'

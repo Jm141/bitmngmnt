@@ -26,13 +26,17 @@
                     <form method="post">
                         {% csrf_token %}
                         
+                        <div class="alert alert-info" style="background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af;">
+                            <i class="fas fa-info-circle"></i> <strong>Note:</strong> Lot number will be auto-generated if left blank (format: LOT-ITEMCODE-TIMESTAMP)
+                        </div>
+                        
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.item.id_for_label }}">{{ form.item.label }}</label>
+                                    <label for="{{ form.item.id_for_label }}" class="form-label">{{ form.item.label }} <span class="text-danger">*</span></label>
                                     {{ form.item }}
                                     {% if form.item.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.item.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -40,12 +44,13 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-md-6" style="display:none;">
+                            <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.lot_no.id_for_label }}">{{ form.lot_no.label }}</label>
+                                    <label for="{{ form.lot_no.id_for_label }}" class="form-label">{{ form.lot_no.label }}</label>
                                     {{ form.lot_no }}
+                                    <small class="form-text text-muted">Leave blank for auto-generation</small>
                                     {% if form.lot_no.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.lot_no.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -66,10 +71,10 @@
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label for="{{ form.qty.id_for_label }}">{{ form.qty.label }}</label>
+                                    <label for="{{ form.qty.id_for_label }}" class="form-label">{{ form.qty.label }} <span class="text-danger">*</span></label>
                                     {{ form.qty }}
                                     {% if form.qty.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.qty.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -79,10 +84,11 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label for="{{ form.unit.id_for_label }}">{{ form.unit.label }}</label>
+                                    <label for="{{ form.unit.id_for_label }}" class="form-label">{{ form.unit.label }} <span class="text-danger">*</span></label>
                                     {{ form.unit }}
+                                    <small class="form-text text-muted">Auto-filled from item</small>
                                     {% if form.unit.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.unit.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -92,10 +98,11 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label for="{{ form.unit_cost.id_for_label }}">{{ form.unit_cost.label }}</label>
+                                    <label for="{{ form.unit_cost.id_for_label }}" class="form-label">{{ form.unit_cost.label }} <span class="text-danger">*</span></label>
                                     {{ form.unit_cost }}
+                                    <small class="form-text text-muted">Cost per unit (₱)</small>
                                     {% if form.unit_cost.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.unit_cost.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -108,10 +115,11 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.supplier.id_for_label }}">{{ form.supplier.label }}</label>
+                                    <label for="{{ form.supplier.id_for_label }}" class="form-label">{{ form.supplier.label }}</label>
                                     {{ form.supplier }}
+                                    <small class="form-text text-muted">Optional: select supplier</small>
                                     {% if form.supplier.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.supplier.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -121,10 +129,11 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+                                    <label for="{{ form.expires_at.id_for_label }}" class="form-label">{{ form.expires_at.label }}</label>
                                     {{ form.expires_at }}
+                                    <small class="form-text text-muted">Required for perishable items</small>
                                     {% if form.expires_at.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.expires_at.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -137,10 +146,11 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.ref_no.id_for_label }}">{{ form.ref_no.label }}</label>
+                                    <label for="{{ form.ref_no.id_for_label }}" class="form-label">{{ form.ref_no.label }}</label>
                                     {{ form.ref_no }}
+                                    <small class="form-text text-muted">PO number, DR number, etc.</small>
                                     {% if form.ref_no.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.ref_no.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -151,10 +161,11 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
                             {{ form.notes }}
+                            <small class="form-text text-muted">Additional notes or remarks</small>
                             {% if form.notes.errors %}
-                                <div class="text-danger">
+                                <div class="text-danger mt-1">
                                     {% for error in form.notes.errors %}
                                         <small>{{ error }}</small>
                                     {% endfor %}
@@ -189,17 +200,17 @@
                     <h6 class="m-0 font-weight-bold text-info">Help</h6>
                 </div>
                 <div class="card-body">
-                    <h6>Lot Number</h6>
-                    <p class="text-muted small">Unique identifier for this batch of stock. Can be supplier batch number or internal reference.</p>
+                    <h6><i class="fas fa-barcode"></i> Auto-Generated Lot Number</h6>
+                    <p class="text-muted small">Lot numbers are automatically generated if left blank in format <code>LOT-[ITEMCODE]-[TIMESTAMP]</code>. You can also enter your own lot number (e.g., supplier batch number).</p>
                     
-                    <h6>Expiry Date</h6>
-                    <p class="text-muted small">Required for perishable items. Leave blank for non-perishable items.</p>
+                    <h6><i class="fas fa-calendar-alt"></i> Expiry Date</h6>
+                    <p class="text-muted small">Required for perishable items. The system automatically enables this field for perishable items and uses FEFO (First Expiry, First Out) for stock management.</p>
                     
-                    <h6>Unit Cost</h6>
-                    <p class="text-muted small">Cost per unit for this lot. Used for inventory valuation and cost calculations.</p>
+                    <h6><i class="fas fa-peso-sign"></i> Unit Cost</h6>
+                    <p class="text-muted small">Cost per unit for this lot in Pesos (₱). Used for inventory valuation and cost calculations. Important for accurate financial reporting.</p>
                     
-                    <h6>Reference Number</h6>
-                    <p class="text-muted small">Optional reference like purchase order number, delivery receipt, etc.</p>
+                    <h6><i class="fas fa-file-alt"></i> Reference Number</h6>
+                    <p class="text-muted small">Optional reference like purchase order number, delivery receipt number, or invoice number for tracking purposes.</p>
                 </div>
             </div>
         </div>

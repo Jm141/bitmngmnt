@@ -11,17 +11,19 @@ from django.utils import timezone
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
-from .models import User, UserLinks, UserAccess, AuditLog, AttendanceRecord, ShiftSchedule, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem
+from .models import User, UserLinks, UserAccess, AuditLog, AttendanceRecord, ShiftSchedule, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem, PurchaseOrder, PurchaseOrderItem
 from .security import (
     role_required, permission_required, super_admin_required, admin_required,
     log_user_action, validate_user_input, sanitize_input, can_manage_user,
-    get_user_permissions, check_user_permissions, get_manila_now
+    get_user_permissions, check_user_permissions, get_manila_now,
+    supplier_required, supplier_or_admin_required
 )
-from .forms import UserForm, UserAccessForm, UserLinksForm, SupplierForm, ItemForm, StockLotForm, StockMovementForm, RecipeForm, RecipeItemForm, StockReceiveForm, StockConsumeForm, ProductionForm
-from .services import InventoryService, RecipeService
+from .forms import UserForm, UserAccessForm, UserLinksForm, SupplierForm, ItemForm, StockLotForm, StockMovementForm, RecipeForm, RecipeItemForm, StockReceiveForm, StockConsumeForm, ProductionForm, PurchaseOrderForm, PurchaseOrderItemForm, PurchaseOrderApproveForm, QRCodeScanForm
+from .services import InventoryService, RecipeService, PurchaseOrderService
 import json
 from django.http import HttpResponseBadRequest
 from django.core.serializers.json import DjangoJSONEncoder
+from decimal import Decimal
 
 
 @login_required
@@ -29,14 +31,128 @@ def dashboard(request):
     """
     Main dashboard view
     """
+    # Supplier users: redirect to supplier dashboard
+    if request.user.is_supplier_user():
+        return redirect('inventory:supplier_dashboard')
+    
     # Staff users: redirect to attendance dashboard
     if request.user.role == 'staff':
         return redirect('inventory:attendance_dashboard')
 
+    from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+    from datetime import timedelta
+    
+    # Calculate total products (active items)
+    total_products = Item.objects.filter(is_active=True).count()
+    
+    # Calculate total inventory value (sum of stock lots)
+    total_value = StockLot.objects.filter(
+        qty__gt=0
+    ).aggregate(
+        total=Sum(ExpressionWrapper(
+            F('qty') * F('unit_cost'),
+            output_field=DecimalField()
+        ))
+    )['total'] or 0
+    
+    # Calculate low stock items (items below reorder level)
+    low_stock_count = 0
+    out_of_stock_count = 0
+    for item in Item.objects.filter(is_active=True):
+        current_stock = item.get_current_stock()
+        if current_stock == 0:
+            out_of_stock_count += 1
+        elif current_stock <= item.reorder_level:
+            low_stock_count += 1
+    
+    # Get recent items with stock information (last 5 items updated)
+    recent_items = Item.objects.filter(is_active=True).order_by('-updated_at')[:5]
+    recent_items_data = []
+    for item in recent_items:
+        current_stock = item.get_current_stock()
+        item_value = StockLot.objects.filter(
+            item=item,
+            qty__gt=0
+        ).aggregate(
+            total=Sum(ExpressionWrapper(
+                F('qty') * F('unit_cost'),
+                output_field=DecimalField()
+            ))
+        )['total'] or 0
+        
+        # Determine status
+        if current_stock == 0:
+            status = 'Out of Stock'
+            status_class = 'danger'
+        elif current_stock <= item.reorder_level:
+            status = 'Low Stock'
+            status_class = 'warning'
+        else:
+            status = 'In Stock'
+            status_class = 'success'
+        
+        recent_items_data.append({
+            'item': item,
+            'current_stock': current_stock,
+            'value': item_value,
+            'status': status,
+            'status_class': status_class,
+        })
+    
+    # Get monthly data for stock value trend (last 6 months)
+    monthly_values = []
+    monthly_labels = []
+    current_date = timezone.now()
+    
+    for i in range(6):
+        # Calculate month offset
+        month_date = current_date - timedelta(days=30 * (5 - i))
+        month_label = month_date.strftime('%b')
+        monthly_labels.append(month_label)
+        
+        # Get total stock value at that time
+        month_value = StockLot.objects.filter(
+            received_at__lte=month_date,
+            qty__gt=0
+        ).aggregate(
+            total=Sum(ExpressionWrapper(
+                F('qty') * F('unit_cost'),
+                output_field=DecimalField()
+            ))
+        )['total'] or 0
+        
+        monthly_values.append(float(month_value))
+    
+    # Calculate previous month statistics for comparison
+    prev_month_date = current_date - timedelta(days=30)
+    
+    prev_total_value = StockLot.objects.filter(
+        received_at__lte=prev_month_date,
+        qty__gt=0
+    ).aggregate(
+        total=Sum(ExpressionWrapper(
+            F('qty') * F('unit_cost'),
+            output_field=DecimalField()
+        ))
+    )['total'] or 0
+    
+    # Calculate percentage changes
+    value_change = 0
+    if prev_total_value > 0:
+        value_change = ((float(total_value) - float(prev_total_value)) / float(prev_total_value)) * 100
+    
     context = {
         'user': request.user,
         'permissions': get_user_permissions(request.user),
-        'recent_activities': AuditLog.objects.filter(user=request.user)[:10],
+        'recent_activities': AuditLog.objects.select_related('user').order_by('-timestamp')[:6],
+        'total_products': total_products,
+        'total_value': total_value,
+        'low_stock_count': low_stock_count,
+        'out_of_stock_count': out_of_stock_count,
+        'recent_items_data': recent_items_data,
+        'monthly_values': json.dumps(monthly_values),
+        'monthly_labels': json.dumps(monthly_labels),
+        'value_change': value_change,
     }
     return render(request, 'inventory/dashboard.html', context)
 
@@ -1273,3 +1389,589 @@ def stock_report(request):
     }
     
     return render(request, 'inventory/stock_report.html', context)
+
+
+# --- PURCHASE ORDER VIEWS ---
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_list(request):
+    """
+    List all purchase orders with filtering
+    """
+    status_filter = request.GET.get('status', '')
+    supplier_filter = request.GET.get('supplier', '')
+    
+    orders = PurchaseOrder.objects.select_related('supplier', 'created_by').all()
+    
+    # Apply filters
+    if status_filter:
+        orders = orders.filter(status=status_filter)
+    
+    if supplier_filter:
+        orders = orders.filter(supplier__id=supplier_filter)
+    
+    # Pagination
+    paginator = Paginator(orders, 20)
+    page_number = request.GET.get('page')
+    orders = paginator.get_page(page_number)
+    
+    # Get summary statistics
+    order_summary = PurchaseOrderService.get_order_summary()
+    
+    context = {
+        'orders': orders,
+        'status_filter': status_filter,
+        'supplier_filter': supplier_filter,
+        'status_choices': PurchaseOrder.STATUS_CHOICES,
+        'suppliers': Supplier.objects.filter(is_active=True),
+        'order_summary': order_summary,
+    }
+    
+    log_user_action(
+        user=request.user,
+        action_type='read',
+        target_model='PurchaseOrder',
+        description="Viewed purchase order list",
+        request=request
+    )
+    
+    return render(request, 'inventory/purchase_order_list.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def purchase_order_detail(request, order_id):
+    """
+    View purchase order details with QR code
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    # Generate QR code image
+    qr_code_image = PurchaseOrderService.generate_qr_code_image(order.qr_code)
+    
+    # Get order items
+    order_items = order.order_items.select_related('item').all()
+    
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'qr_code_image': qr_code_image,
+    }
+    
+    log_user_action(
+        user=request.user,
+        action_type='read',
+        target_model='PurchaseOrder',
+        target_id=order_id,
+        description=f"Viewed purchase order {order.order_no}",
+        request=request
+    )
+    
+    return render(request, 'inventory/purchase_order_detail.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_create(request):
+    """
+    Create new purchase order with items (no prices yet - supplier fills prices during approval)
+    """
+    if request.method == 'POST':
+        form = PurchaseOrderForm(request.POST)
+        
+        # Get items data from POST (quantities only, no prices)
+        items_data = []
+        item_count = int(request.POST.get('item_count', 0))
+        
+        for i in range(item_count):
+            item_id = request.POST.get(f'item_{i}')
+            qty = request.POST.get(f'qty_{i}')
+            notes = request.POST.get(f'item_notes_{i}', '')
+            
+            if item_id and qty:
+                try:
+                    item = Item.objects.get(id=item_id)
+                    items_data.append({
+                        'item': item,
+                        'qty': Decimal(qty),
+                        'unit_price': Decimal('0'),  # Price will be set by supplier
+                        'notes': notes
+                    })
+                except (Item.DoesNotExist, ValueError):
+                    pass
+        
+        if form.is_valid() and items_data:
+            try:
+                po = PurchaseOrderService.create_purchase_order(
+                    supplier=form.cleaned_data['supplier'],
+                    items_data=items_data,
+                    user=request.user,
+                    notes=form.cleaned_data.get('notes'),
+                    expected_delivery_date=None  # Will be set by supplier
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='create',
+                    target_model='PurchaseOrder',
+                    target_id=po.id,
+                    description=f"Created purchase order {po.order_no}",
+                    request=request
+                )
+                
+                messages.success(request, f"Purchase order {po.order_no} created successfully. Waiting for supplier approval and pricing.")
+                return redirect('inventory:purchase_order_detail', order_id=po.id)
+            except Exception as e:
+                messages.error(request, f"Error creating purchase order: {str(e)}")
+        else:
+            if not items_data:
+                messages.error(request, "Please add at least one item to the purchase order.")
+    else:
+        form = PurchaseOrderForm()
+    
+    # Get all active items for selection
+    items = Item.objects.filter(is_active=True).order_by('name')
+    
+    context = {
+        'form': form,
+        'items': items,
+        'title': 'Create Purchase Order',
+    }
+    
+    return render(request, 'inventory/purchase_order_form.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_approve(request, order_id):
+    """
+    Approve purchase order with pricing (staff simulating supplier action)
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    if not order.can_be_approved():
+        messages.error(request, f"Purchase order cannot be approved. Current status: {order.get_status_display()}")
+        return redirect('inventory:purchase_order_detail', order_id=order_id)
+    
+    order_items = order.order_items.all()
+    
+    if request.method == 'POST':
+        form = PurchaseOrderApproveForm(request.POST, order_items=order_items)
+        if form.is_valid():
+            try:
+                # Update item prices from form
+                item_prices = form.get_item_prices()
+                for po_item in order_items:
+                    price_key = str(po_item.id)
+                    if price_key in item_prices:
+                        po_item.unit_price = item_prices[price_key]
+                        po_item.save()
+                
+                # Recalculate total
+                order.total_amount = order.calculate_total()
+                order.save()
+                
+                # Approve order
+                PurchaseOrderService.approve_purchase_order(
+                    po=order,
+                    supplier_notes=form.cleaned_data.get('supplier_notes'),
+                    expected_delivery_date=form.cleaned_data['expected_delivery_date']
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='update',
+                    target_model='PurchaseOrder',
+                    target_id=order_id,
+                    description=f"Approved purchase order {order.order_no} with pricing",
+                    request=request
+                )
+                
+                messages.success(request, f"Purchase order {order.order_no} approved successfully with pricing.")
+                return redirect('inventory:purchase_order_detail', order_id=order_id)
+            except Exception as e:
+                messages.error(request, f"Error approving purchase order: {str(e)}")
+    else:
+        form = PurchaseOrderApproveForm(
+            initial={'expected_delivery_date': order.expected_delivery_date},
+            order_items=order_items
+        )
+    
+    context = {
+        'form': form,
+        'order': order,
+        'order_items': order_items,
+        'title': f'Approve Purchase Order: {order.order_no}',
+    }
+    
+    return render(request, 'inventory/purchase_order_approve.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_ship(request, order_id):
+    """
+    Mark purchase order as shipped
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    if not order.can_be_shipped():
+        messages.error(request, f"Purchase order cannot be shipped. Current status: {order.get_status_display()}")
+        return redirect('inventory:purchase_order_detail', order_id=order_id)
+    
+    if request.method == 'POST':
+        try:
+            PurchaseOrderService.ship_purchase_order(order)
+            
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='PurchaseOrder',
+                target_id=order_id,
+                description=f"Marked purchase order {order.order_no} as shipped",
+                request=request
+            )
+            
+            messages.success(request, f"Purchase order {order.order_no} marked as shipped.")
+        except Exception as e:
+            messages.error(request, f"Error shipping purchase order: {str(e)}")
+    
+    return redirect('inventory:purchase_order_detail', order_id=order_id)
+
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_scan_receive(request):
+    """
+    Scan QR code to receive purchase order
+    """
+    if request.method == 'POST':
+        form = QRCodeScanForm(request.POST)
+        if form.is_valid():
+            qr_code = form.cleaned_data['qr_code']
+            
+            try:
+                po, received_lots = PurchaseOrderService.receive_purchase_order_by_qr(
+                    qr_code=qr_code,
+                    user=request.user
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='update',
+                    target_model='PurchaseOrder',
+                    target_id=po.id,
+                    description=f"Received purchase order {po.order_no} via QR scan",
+                    request=request
+                )
+                
+                messages.success(request, f"Purchase order {po.order_no} received successfully! {len(received_lots)} items added to inventory.")
+                return redirect('inventory:purchase_order_detail', order_id=po.id)
+                
+            except ValueError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, f"Error receiving purchase order: {str(e)}")
+    else:
+        form = QRCodeScanForm()
+    
+    # Get orders waiting to be received
+    shipped_orders = PurchaseOrderService.get_shipped_orders()
+    
+    context = {
+        'form': form,
+        'shipped_orders': shipped_orders,
+        'title': 'Receive Purchase Order',
+    }
+    
+    return render(request, 'inventory/purchase_order_scan.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_cancel(request, order_id):
+    """
+    Cancel purchase order
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    if order.status == 'received':
+        messages.error(request, "Cannot cancel a received purchase order.")
+        return redirect('inventory:purchase_order_detail', order_id=order_id)
+    
+    if request.method == 'POST':
+        order.status = 'cancelled'
+        order.save()
+        
+        log_user_action(
+            user=request.user,
+            action_type='update',
+            target_model='PurchaseOrder',
+            target_id=order_id,
+            description=f"Cancelled purchase order {order.order_no}",
+            request=request
+        )
+        
+        messages.success(request, f"Purchase order {order.order_no} cancelled.")
+        return redirect('inventory:purchase_order_list')
+    
+    return redirect('inventory:purchase_order_detail', order_id=order_id)
+
+
+# --- SUPPLIER PORTAL VIEWS ---
+
+@login_required
+@supplier_required
+def supplier_dashboard(request):
+    """
+    Supplier portal dashboard
+    """
+    supplier = request.user.supplier
+    
+    # Get order statistics
+    orders = PurchaseOrder.objects.filter(supplier=supplier)
+    pending_orders = orders.filter(status='pending').count()
+    approved_orders = orders.filter(status='approved').count()
+    shipped_orders = orders.filter(status='shipped').count()
+    received_orders = orders.filter(status='received').count()
+    
+    # Get recent orders
+    recent_orders = orders.order_by('-created_at')[:5]
+    
+    # Calculate total order value
+    from django.db.models import Sum
+    total_order_value = orders.filter(status__in=['approved', 'shipped', 'received']).aggregate(
+        total=Sum('total_amount')
+    )['total'] or 0
+    
+    context = {
+        'supplier': supplier,
+        'pending_orders': pending_orders,
+        'approved_orders': approved_orders,
+        'shipped_orders': shipped_orders,
+        'received_orders': received_orders,
+        'recent_orders': recent_orders,
+        'total_order_value': total_order_value,
+    }
+    
+    log_user_action(
+        user=request.user,
+        action_type='read',
+        target_model='SupplierDashboard',
+        description="Viewed supplier dashboard",
+        request=request
+    )
+    
+    return render(request, 'inventory/supplier_dashboard.html', context)
+
+
+@login_required
+@supplier_required
+def supplier_orders(request):
+    """
+    List all orders for this supplier
+    """
+    supplier = request.user.supplier
+    status_filter = request.GET.get('status', '')
+    
+    orders = PurchaseOrder.objects.filter(supplier=supplier)
+    
+    if status_filter:
+        orders = orders.filter(status=status_filter)
+    
+    # Pagination
+    paginator = Paginator(orders, 20)
+    page_number = request.GET.get('page')
+    orders = paginator.get_page(page_number)
+    
+    context = {
+        'orders': orders,
+        'status_filter': status_filter,
+        'status_choices': PurchaseOrder.STATUS_CHOICES,
+        'supplier': supplier,
+    }
+    
+    return render(request, 'inventory/supplier_orders.html', context)
+
+
+@login_required
+@supplier_required
+def supplier_order_detail(request, order_id):
+    """
+    View order details (supplier view)
+    """
+    supplier = request.user.supplier
+    order = get_object_or_404(PurchaseOrder, id=order_id, supplier=supplier)
+    
+    # Generate QR code image
+    qr_code_image = PurchaseOrderService.generate_qr_code_image(order.qr_code)
+    
+    # Get order items
+    order_items = order.order_items.select_related('item').all()
+    
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'qr_code_image': qr_code_image,
+        'supplier': supplier,
+    }
+    
+    log_user_action(
+        user=request.user,
+        action_type='read',
+        target_model='PurchaseOrder',
+        target_id=order_id,
+        description=f"Supplier viewed purchase order {order.order_no}",
+        request=request
+    )
+    
+    return render(request, 'inventory/supplier_order_detail.html', context)
+
+
+@login_required
+@supplier_required
+def supplier_order_approve(request, order_id):
+    """
+    Supplier approves purchase order with pricing and delivery date
+    """
+    supplier = request.user.supplier
+    order = get_object_or_404(PurchaseOrder, id=order_id, supplier=supplier)
+    
+    if not order.can_be_approved():
+        messages.error(request, f"Purchase order cannot be approved. Current status: {order.get_status_display()}")
+        return redirect('inventory:supplier_order_detail', order_id=order_id)
+    
+    order_items = order.order_items.all()
+    
+    if request.method == 'POST':
+        form = PurchaseOrderApproveForm(request.POST, order_items=order_items)
+        if form.is_valid():
+            try:
+                # Update item prices from supplier
+                item_prices = form.get_item_prices()
+                total_amount = Decimal('0')
+                
+                for po_item in order_items:
+                    price_key = str(po_item.id)
+                    if price_key in item_prices:
+                        po_item.unit_price = item_prices[price_key]
+                        po_item.save()
+                        total_amount += po_item.subtotal()
+                
+                # Update total amount
+                order.total_amount = total_amount
+                order.save()
+                
+                # Approve order
+                PurchaseOrderService.approve_purchase_order(
+                    po=order,
+                    supplier_notes=form.cleaned_data.get('supplier_notes'),
+                    expected_delivery_date=form.cleaned_data['expected_delivery_date']
+                )
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='update',
+                    target_model='PurchaseOrder',
+                    target_id=order_id,
+                    description=f"Supplier approved purchase order {order.order_no} with total amount ₱{total_amount}",
+                    request=request
+                )
+                
+                messages.success(request, f"Purchase order {order.order_no} approved successfully with total amount ₱{total_amount:,.2f}")
+                
+                # TODO: Send email notification to customer
+                
+                return redirect('inventory:supplier_order_detail', order_id=order_id)
+            except Exception as e:
+                messages.error(request, f"Error approving purchase order: {str(e)}")
+    else:
+        form = PurchaseOrderApproveForm(
+            initial={'expected_delivery_date': order.expected_delivery_date},
+            order_items=order_items
+        )
+    
+    context = {
+        'form': form,
+        'order': order,
+        'order_items': order_items,
+        'supplier': supplier,
+        'title': f'Approve Purchase Order: {order.order_no}',
+    }
+    
+    return render(request, 'inventory/supplier_order_approve.html', context)
+
+
+@login_required
+@supplier_required
+def supplier_order_ship(request, order_id):
+    """
+    Supplier marks order as shipped
+    """
+    supplier = request.user.supplier
+    order = get_object_or_404(PurchaseOrder, id=order_id, supplier=supplier)
+    
+    if not order.can_be_shipped():
+        messages.error(request, f"Purchase order cannot be shipped. Current status: {order.get_status_display()}")
+        return redirect('inventory:supplier_order_detail', order_id=order_id)
+    
+    if request.method == 'POST':
+        try:
+            PurchaseOrderService.ship_purchase_order(order)
+            
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='PurchaseOrder',
+                target_id=order_id,
+                description=f"Supplier marked purchase order {order.order_no} as shipped",
+                request=request
+            )
+            
+            messages.success(request, f"Purchase order {order.order_no} marked as shipped.")
+            
+            # TODO: Send email notification to customer
+            
+        except Exception as e:
+            messages.error(request, f"Error shipping purchase order: {str(e)}")
+    
+    return redirect('inventory:supplier_order_detail', order_id=order_id)
+
+
+# Supplier Login View
+def supplier_login(request):
+    """
+    Separate login page for suppliers
+    """
+    if request.user.is_authenticated:
+        if request.user.is_supplier_user():
+            return redirect('inventory:supplier_dashboard')
+        else:
+            return redirect('inventory:dashboard')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        from django.contrib.auth import authenticate
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            if user.is_supplier_user():
+                login(request, user)
+                log_user_action(
+                    user=user,
+                    action_type='login',
+                    target_model='User',
+                    description=f"Supplier user logged in",
+                    request=request
+                )
+                messages.success(request, f"Welcome back, {user.supplier.name}!")
+                return redirect('inventory:supplier_dashboard')
+            else:
+                messages.error(request, "This account is not a supplier account. Please use the regular login.")
+        else:
+            messages.error(request, "Invalid username or password.")
+    
+    return render(request, 'inventory/supplier_login.html')

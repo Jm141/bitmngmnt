@@ -60,4 +60,21 @@ urlpatterns = [
     
     # Reports
     path('reports/stock/', views.stock_report, name='stock_report'),
+    
+    # Purchase Orders
+    path('purchase-orders/', views.purchase_order_list, name='purchase_order_list'),
+    path('purchase-orders/create/', views.purchase_order_create, name='purchase_order_create'),
+    path('purchase-orders/<uuid:order_id>/', views.purchase_order_detail, name='purchase_order_detail'),
+    path('purchase-orders/<uuid:order_id>/approve/', views.purchase_order_approve, name='purchase_order_approve'),
+    path('purchase-orders/<uuid:order_id>/ship/', views.purchase_order_ship, name='purchase_order_ship'),
+    path('purchase-orders/<uuid:order_id>/cancel/', views.purchase_order_cancel, name='purchase_order_cancel'),
+    path('purchase-orders/scan/receive/', views.purchase_order_scan_receive, name='purchase_order_scan_receive'),
+    
+    # Supplier Portal
+    path('supplier/login/', views.supplier_login, name='supplier_login'),
+    path('supplier/dashboard/', views.supplier_dashboard, name='supplier_dashboard'),
+    path('supplier/orders/', views.supplier_orders, name='supplier_orders'),
+    path('supplier/orders/<uuid:order_id>/', views.supplier_order_detail, name='supplier_order_detail'),
+    path('supplier/orders/<uuid:order_id>/approve/', views.supplier_order_approve, name='supplier_order_approve'),
+    path('supplier/orders/<uuid:order_id>/ship/', views.supplier_order_ship, name='supplier_order_ship'),
 ]

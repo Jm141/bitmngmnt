@@ -1,0 +1,205 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-qrcode me-2"></i>{{ title }}</h2>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:purchase_order_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to List
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- QR Scan Form -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>Scan QR Code</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Instructions:</strong> Scan the QR code from the delivery package to automatically receive the purchase order and add all items to inventory.
+                    </div>
+
+                    <form method="post" id="qrScanForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.qr_code.id_for_label }}" class="form-label">QR Code *</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text"><i class="fas fa-qrcode"></i></span>
+                                {{ form.qr_code }}
+                                <button type="button" class="btn btn-outline-primary" id="openCameraBtn">
+                                    <i class="fas fa-camera"></i> Scan
+                                </button>
+                            </div>
+                            {% if form.qr_code.errors %}
+                                <div class="text-danger">{{ form.qr_code.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.qr_code.help_text }}</div>
+                        </div>
+
+                        <!-- Camera Scanner (Hidden by default) -->
+                        <div id="cameraScanner" class="mb-3" style="display: none;">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-camera me-2"></i>Camera Scanner</span>
+                                    <button type="button" class="btn btn-sm btn-light" id="closeCameraBtn">
+                                        <i class="fas fa-times"></i> Close
+                                    </button>
+                                </div>
+                                <div class="card-body text-center">
+                                    <video id="qrVideo" style="width: 100%; max-width: 500px; border-radius: 8px;"></video>
+                                    <div id="scanStatus" class="mt-2"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-box-open me-2"></i>Receive Purchase Order
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr>
+
+                    <div class="text-center">
+                        <h6 class="text-muted">What happens when you receive an order?</h6>
+                        <ul class="text-start small">
+                            <li>Purchase order status will be updated to "Received"</li>
+                            <li>All items will be automatically added to inventory as stock lots</li>
+                            <li>Stock lot numbers will be generated automatically</li>
+                            <li>Expiry dates will be calculated for perishable items</li>
+                            <li>Supplier will be notified that the order was received</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Shipments -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-shipping-fast me-2"></i>Orders Waiting to be Received</h5>
+                </div>
+                <div class="card-body">
+                    {% if shipped_orders %}
+                        <div class="list-group">
+                            {% for order in shipped_orders %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">
+                                            <a href="{% url 'inventory:purchase_order_detail' order.id %}">
+                                                {{ order.order_no }}
+                                            </a>
+                                        </h6>
+                                        <span class="badge bg-primary">Shipped</span>
+                                    </div>
+                                    <p class="mb-1 small"><strong>Supplier:</strong> {{ order.supplier.name }}</p>
+                                    <p class="mb-1 small"><strong>Shipped:</strong> {{ order.shipped_at|date:"Y-m-d H:i" }}</p>
+                                    <p class="mb-1 small"><strong>Expected:</strong> {{ order.expected_delivery_date|date:"Y-m-d" }}</p>
+                                    <p class="mb-0 small"><strong>QR Code:</strong> <code class="small">{{ order.qr_code }}</code></p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No orders waiting to be received.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+// Auto-focus on QR code input
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('{{ form.qr_code.id_for_label }}').focus();
+});
+
+// Auto-submit form when QR code is scanned (optional)
+// This assumes the QR scanner adds a newline after scanning
+document.getElementById('{{ form.qr_code.id_for_label }}').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        this.form.submit();
+    }
+});
+
+// Camera QR Code Scanner
+let html5QrcodeScanner = null;
+
+document.getElementById('openCameraBtn').addEventListener('click', function() {
+    const scannerDiv = document.getElementById('cameraScanner');
+    const statusDiv = document.getElementById('scanStatus');
+    
+    // Show camera div
+    scannerDiv.style.display = 'block';
+    
+    // Initialize scanner
+    html5QrcodeScanner = new Html5Qrcode("qrVideo");
+    
+    statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-camera me-2"></i>Starting camera... Please allow camera access.</div>';
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, // Use back camera on mobile
+        config,
+        (decodedText, decodedResult) => {
+            // QR Code detected!
+            statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>QR Code detected!</div>';
+            
+            // Fill in the QR code input
+            document.getElementById('{{ form.qr_code.id_for_label }}').value = decodedText;
+            
+            // Stop scanner
+            html5QrcodeScanner.stop().then(() => {
+                scannerDiv.style.display = 'none';
+                
+                // Auto-submit form
+                setTimeout(() => {
+                    document.getElementById('qrScanForm').submit();
+                }, 500);
+            });
+        },
+        (errorMessage) => {
+            // Scanning error (ignore, this fires continuously when no QR detected)
+        }
+    ).catch(err => {
+        statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Error accessing camera. Please check permissions.</div>';
+        console.error('Camera error:', err);
+    });
+});
+
+document.getElementById('closeCameraBtn').addEventListener('click', function() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            document.getElementById('cameraScanner').style.display = 'none';
+        }).catch(err => {
+            console.error('Error stopping scanner:', err);
+            document.getElementById('cameraScanner').style.display = 'none';
+        });
+    }
+});
+</script>
+{% endblock %}
+

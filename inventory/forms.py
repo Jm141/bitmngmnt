@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
-from .models import User, UserAccess, UserLinks, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem
+from .models import User, UserAccess, UserLinks, Supplier, Item, StockLot, StockMovement, Recipe, RecipeItem, PurchaseOrder, PurchaseOrderItem
 from .security import validate_user_input, sanitize_input
 
 
@@ -393,13 +393,12 @@ class SupplierForm(forms.ModelForm):
 
 class ItemForm(forms.ModelForm):
     """
-    Form for managing items
+    Form for managing items (code is auto-generated)
     """
     class Meta:
         model = Item
-        fields = ['code', 'name', 'category', 'unit', 'description', 'reorder_level', 'min_order_qty', 'is_perishable', 'shelf_life_days', 'is_active']
+        fields = ['name', 'category', 'unit', 'description', 'reorder_level', 'min_order_qty', 'is_perishable', 'shelf_life_days', 'is_active']
         widgets = {
-            'code': forms.TextInput(attrs={'class': 'form-control'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-control'}),
             'unit': forms.Select(attrs={'class': 'form-control'}),
@@ -576,7 +575,7 @@ class RecipeItemForm(forms.ModelForm):
 
 class StockReceiveForm(forms.Form):
     """
-    Form for receiving stock
+    Form for receiving stock (lot_no is auto-generated if not provided)
     """
     item = forms.ModelChoiceField(
         queryset=Item.objects.filter(is_active=True),
@@ -584,7 +583,8 @@ class StockReceiveForm(forms.Form):
     )
     lot_no = forms.CharField(
         max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Auto-generated if left blank'})
     )
     qty = forms.DecimalField(
         max_digits=10,
@@ -707,3 +707,136 @@ class ProductionForm(forms.Form):
         if production_qty is not None and production_qty <= 0:
             raise ValidationError("Production quantity must be greater than 0.")
         return production_qty
+
+
+# --- PURCHASE ORDER FORMS ---
+
+class PurchaseOrderForm(forms.ModelForm):
+    """
+    Form for creating purchase orders (staff creates, supplier sets prices later)
+    """
+    class Meta:
+        model = PurchaseOrder
+        fields = ['supplier', 'notes']
+        widgets = {
+            'supplier': forms.Select(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Special instructions or requirements...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter suppliers to only show active ones
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
+        self.fields['notes'].help_text = "Any special requirements or delivery instructions"
+
+
+class PurchaseOrderItemForm(forms.ModelForm):
+    """
+    Form for adding items to purchase order
+    """
+    class Meta:
+        model = PurchaseOrderItem
+        fields = ['item', 'qty_ordered', 'unit_price', 'notes']
+        widgets = {
+            'item': forms.Select(attrs={'class': 'form-control'}),
+            'qty_ordered': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter items to only show active ingredients
+        self.fields['item'].queryset = Item.objects.filter(is_active=True)
+
+    def clean_qty_ordered(self):
+        qty = self.cleaned_data.get('qty_ordered')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0.")
+        return qty
+
+    def clean_unit_price(self):
+        price = self.cleaned_data.get('unit_price')
+        if price is not None and price < 0:
+            raise ValidationError("Unit price cannot be negative.")
+        return price
+
+
+class PurchaseOrderApproveForm(forms.Form):
+    """
+    Form for supplier to approve purchase order with pricing
+    Supplier fills in unit prices and delivery date during approval
+    """
+    expected_delivery_date = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        help_text="When can you deliver this order?"
+    )
+    supplier_notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Any notes or special conditions...'}),
+        help_text="Any notes, conditions, or comments about this order"
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.order_items = kwargs.pop('order_items', None)
+        super().__init__(*args, **kwargs)
+        
+        # Dynamically add price fields for each order item
+        if self.order_items:
+            for idx, po_item in enumerate(self.order_items):
+                field_name = f'item_price_{po_item.id}'
+                self.fields[field_name] = forms.DecimalField(
+                    label=f'Unit Price for {po_item.item.name}',
+                    max_digits=10,
+                    decimal_places=2,
+                    required=True,
+                    initial=po_item.unit_price if po_item.unit_price > 0 else None,
+                    widget=forms.NumberInput(attrs={
+                        'class': 'form-control',
+                        'step': '0.01',
+                        'min': '0.01',
+                        'placeholder': f'Price per {po_item.get_unit_display()}'
+                    }),
+                    help_text=f'Quantity: {po_item.qty_ordered} {po_item.get_unit_display()}'
+                )
+
+    def clean_expected_delivery_date(self):
+        date = self.cleaned_data.get('expected_delivery_date')
+        if date and date < timezone.now().date():
+            raise ValidationError("Expected delivery date cannot be in the past.")
+        return date
+    
+    def get_item_prices(self):
+        """Extract item prices from cleaned data"""
+        prices = {}
+        for key, value in self.cleaned_data.items():
+            if key.startswith('item_price_'):
+                item_id = key.replace('item_price_', '')
+                prices[item_id] = value
+        return prices
+
+
+class QRCodeScanForm(forms.Form):
+    """
+    Form for scanning QR code to receive purchase order
+    """
+    qr_code = forms.CharField(
+        max_length=255,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Scan or enter QR code...',
+            'autofocus': True
+        }),
+        help_text="Scan the QR code from the delivery package or enter manually"
+    )
+
+    def clean_qr_code(self):
+        qr_code = self.cleaned_data.get('qr_code')
+        if qr_code:
+            qr_code = qr_code.strip().upper()
+            # Verify QR code format
+            if not qr_code.startswith('PO-'):
+                raise ValidationError("Invalid QR code format. QR code must start with 'PO-'")
+        return qr_code

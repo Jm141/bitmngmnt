@@ -20,10 +20,9 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium" style="color: #8b7e7a;">Total Products</p>
-                        <p class="text-2xl font-bold" style="color: #3c2f2f;">2,847</p>
+                        <p class="text-2xl font-bold" style="color: #3c2f2f;">{{ total_products|default:"0" }}</p>
                         <div class="flex items-center mt-1">
-                            <i class="fas fa-arrow-up text-green-600 text-xs mr-1"></i>
-                            <span class="text-xs text-green-600">+12.5% vs last month</span>
+                            <span class="text-xs" style="color: #8b7e7a;">Active items in inventory</span>
                         </div>
                     </div>
                     <div class="h-12 w-12 rounded-full flex items-center justify-center" style="background: #c9a27b;">
@@ -38,14 +37,21 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium" style="color: #8b7e7a;">Total Value</p>
-                        <p class="text-2xl font-bold" style="color: #3c2f2f;">$284,750</p>
+                        <p class="text-2xl font-bold" style="color: #3c2f2f;">₱{{ total_value|floatformat:2|default:"0.00" }}</p>
                         <div class="flex items-center mt-1">
-                            <i class="fas fa-arrow-up text-green-600 text-xs mr-1"></i>
-                            <span class="text-xs text-green-600">+8.2% vs last month</span>
+                            {% if value_change > 0 %}
+                                <i class="fas fa-arrow-up text-green-600 text-xs mr-1"></i>
+                                <span class="text-xs text-green-600">+{{ value_change|floatformat:1 }}% vs last month</span>
+                            {% elif value_change < 0 %}
+                                <i class="fas fa-arrow-down text-red-600 text-xs mr-1"></i>
+                                <span class="text-xs text-red-600">{{ value_change|floatformat:1 }}% vs last month</span>
+                            {% else %}
+                                <span class="text-xs" style="color: #8b7e7a;">No change vs last month</span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="h-12 w-12 rounded-full flex items-center justify-center" style="background: #c9a27b;">
-                        <i class="fas fa-dollar-sign text-white"></i>
+                        <i class="fas fa-peso-sign text-white"></i>
                     </div>
                 </div>
             </div>
@@ -56,10 +62,14 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium" style="color: #8b7e7a;">Low Stock Items</p>
-                        <p class="text-2xl font-bold" style="color: #3c2f2f;">23</p>
+                        <p class="text-2xl font-bold" style="color: #3c2f2f;">{{ low_stock_count|default:"0" }}</p>
                         <div class="flex items-center mt-1">
-                            <i class="fas fa-arrow-down text-red-600 text-xs mr-1"></i>
-                            <span class="text-xs text-red-600">-4.3% vs last month</span>
+                            {% if low_stock_count > 0 %}
+                                <i class="fas fa-exclamation-triangle text-orange-600 text-xs mr-1"></i>
+                                <span class="text-xs text-orange-600">Needs attention</span>
+                            {% else %}
+                                <span class="text-xs text-green-600">All items well stocked</span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="h-12 w-12 rounded-full flex items-center justify-center" style="background: #c9a27b;">
@@ -74,10 +84,14 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium" style="color: #8b7e7a;">Out of Stock</p>
-                        <p class="text-2xl font-bold" style="color: #3c2f2f;">5</p>
+                        <p class="text-2xl font-bold" style="color: #3c2f2f;">{{ out_of_stock_count|default:"0" }}</p>
                         <div class="flex items-center mt-1">
-                            <i class="fas fa-arrow-down text-red-600 text-xs mr-1"></i>
-                            <span class="text-xs text-red-600">-50% vs last month</span>
+                            {% if out_of_stock_count > 0 %}
+                                <i class="fas fa-times-circle text-red-600 text-xs mr-1"></i>
+                                <span class="text-xs text-red-600">Requires restocking</span>
+                            {% else %}
+                                <span class="text-xs text-green-600">No items out of stock</span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="h-12 w-12 rounded-full flex items-center justify-center" style="background: #c9a27b;">
@@ -99,74 +113,88 @@
                     <p class="text-sm" style="color: #8b7e7a;">Monthly inventory valuation over time</p>
                 </div>
                 <div class="card-body" style="padding: 1.5rem;">
-                    <div class="rounded-lg" style="background: #fbf3eb; width: 100%; height: 300px; position: relative;">
-                        <!-- Chart Container -->
-                        <div class="absolute inset-0 p-6">
-                            <!-- Y-axis labels -->
-                            <div class="absolute left-0 top-0 h-full flex flex-col justify-between text-xs" style="color: #8b7e7a;">
-                                <span>$300k</span>
-                                <span>$225k</span>
-                                <span>$150k</span>
-                                <span>$75k</span>
-                                <span>$0</span>
-                            </div>
-                            
-                            <!-- Chart Area -->
-                            <div class="ml-12 h-full relative">
-                                <!-- Grid lines -->
-                                <div class="absolute inset-0">
-                                    <div class="h-full w-full" style="background-image: linear-gradient(to bottom, transparent 0%, transparent 24%, rgba(139,126,122,0.2) 25%, rgba(139,126,122,0.2) 25%, transparent 26%, transparent 49%, rgba(139,126,122,0.2) 50%, rgba(139,126,122,0.2) 50%, transparent 51%, transparent 74%, rgba(139,126,122,0.2) 75%, rgba(139,126,122,0.2) 75%, transparent 76%, transparent 99%, rgba(139,126,122,0.2) 100%); background-size: 100% 25%;"></div>
-                                </div>
-                                
-                                <!-- Chart bars and line -->
-                                <div class="absolute inset-0 flex items-end justify-between px-4">
-                                    <!-- Jan -->
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-8 rounded-t" style="height: 75%; background: #c9a27b;"></div>
-                                        <span class="text-xs mt-2" style="color: #8b7e7a;">Jan</span>
-                                    </div>
-                                    <!-- Feb -->
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-8 rounded-t" style="height: 60%; background: #c9a27b;"></div>
-                                        <span class="text-xs mt-2" style="color: #8b7e7a;">Feb</span>
-                                    </div>
-                                    <!-- Mar -->
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-8 rounded-t" style="height: 85%; background: #c9a27b;"></div>
-                                        <span class="text-xs mt-2" style="color: #8b7e7a;">Mar</span>
-                                    </div>
-                                    <!-- Apr -->
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-8 rounded-t" style="height: 70%; background: #c9a27b;"></div>
-                                        <span class="text-xs mt-2" style="color: #8b7e7a;">Apr</span>
-                                    </div>
-                                    <!-- May -->
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-8 rounded-t" style="height: 90%; background: #c9a27b;"></div>
-                                        <span class="text-xs mt-2" style="color: #8b7e7a;">May</span>
-                                    </div>
-                                    <!-- Jun -->
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-8 rounded-t" style="height: 95%; background: #c9a27b;"></div>
-                                        <span class="text-xs mt-2" style="color: #8b7e7a;">Jun</span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Trend line -->
-                                <svg class="absolute inset-0 w-full h-full" style="z-index: 10;">
-                                    <polyline 
-                                        points="12%,75% 28%,60% 44%,85% 60%,70% 76%,90% 92%,95%" 
-                                        fill="none" 
-                                        stroke="#c9a27b" 
-                                        stroke-width="3" 
-                                        stroke-dasharray="5,5"
-                                    />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
+                    <canvas id="stockTrendChart" width="400" height="200"></canvas>
                 </div>
             </div>
+            
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const ctx = document.getElementById('stockTrendChart');
+                if (ctx) {
+                    const monthlyLabels = {{ monthly_labels|safe }};
+                    const monthlyValues = {{ monthly_values|safe }};
+                    
+                    // Find max value for scaling
+                    const maxValue = Math.max(...monthlyValues);
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: monthlyLabels,
+                            datasets: [{
+                                label: 'Stock Value (₱)',
+                                data: monthlyValues,
+                                borderColor: '#c9a27b',
+                                backgroundColor: 'rgba(201, 162, 123, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                pointBackgroundColor: '#c9a27b',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 5,
+                                pointHoverRadius: 7
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    backgroundColor: '#3c2f2f',
+                                    titleColor: '#fff',
+                                    bodyColor: '#fff',
+                                    padding: 12,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return '₱' + context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: '#8b7e7a',
+                                        callback: function(value) {
+                                            if (value >= 1000) {
+                                                return '₱' + (value / 1000).toFixed(0) + 'k';
+                                            }
+                                            return '₱' + value;
+                                        }
+                                    },
+                                    grid: {
+                                        color: 'rgba(139, 126, 122, 0.1)'
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: '#8b7e7a'
+                                    },
+                                    grid: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+            </script>
 
             <!-- Recent Inventory Table -->
             <div class="card" style="background: #fffaf5; border: 1px solid rgba(0,0,0,0.05); border-radius: 14px; box-shadow: 0 6px 16px rgba(0,0,0,0.06);">
@@ -175,117 +203,59 @@
                     <p class="text-sm" style="color: #8b7e7a;">Latest updates to your product catalog</p>
                 </div>
                 <div class="card-body" style="padding: 1.5rem;">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b" style="border-color: rgba(139,126,122,0.2);">
-                                    <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Product</th>
-                                    <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Category</th>
-                                    <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Stock</th>
-                                    <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Value</th>
-                                    <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Status</th>
-                                    <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="border-b" style="border-color: rgba(139,126,122,0.1);">
-                                    <td class="py-4">
-                                        <div>
-                                            <p class="text-sm font-medium" style="color: #3c2f2f;">Premium Leather Wallet</p>
-                                            <p class="text-xs" style="color: #8b7e7a;">INV-001</p>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">Accessories</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">145</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">$12,450</td>
-                                    <td class="py-4">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #f3e8d3; color: #3c2f2f;">
-                                            In Stock
-                                        </span>
-                                    </td>
-                                    <td class="py-4">
-                                        <i class="fas fa-ellipsis-v text-sm" style="color: #8b7e7a;"></i>
-                                    </td>
-                                </tr>
-                                <tr class="border-b" style="border-color: rgba(139,126,122,0.1);">
-                                    <td class="py-4">
-                                        <div>
-                                            <p class="text-sm font-medium" style="color: #3c2f2f;">Wireless Headphones</p>
-                                            <p class="text-xs" style="color: #8b7e7a;">INV-002</p>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">Electronics</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">89</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">$8,900</td>
-                                    <td class="py-4">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #f3e8d3; color: #3c2f2f;">
-                                            In Stock
-                                        </span>
-                                    </td>
-                                    <td class="py-4">
-                                        <i class="fas fa-ellipsis-v text-sm" style="color: #8b7e7a;"></i>
-                                    </td>
-                                </tr>
-                                <tr class="border-b" style="border-color: rgba(139,126,122,0.1);">
-                                    <td class="py-4">
-                                        <div>
-                                            <p class="text-sm font-medium" style="color: #3c2f2f;">Designer Sunglasses</p>
-                                            <p class="text-xs" style="color: #8b7e7a;">INV-003</p>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">Accessories</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">12</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">$3,600</td>
-                                    <td class="py-4">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #d4a574; color: #3c2f2f;">
-                                            Low Stock
-                                        </span>
-                                    </td>
-                                    <td class="py-4">
-                                        <i class="fas fa-ellipsis-v text-sm" style="color: #8b7e7a;"></i>
-                                    </td>
-                                </tr>
-                                <tr class="border-b" style="border-color: rgba(139,126,122,0.1);">
-                                    <td class="py-4">
-                                        <div>
-                                            <p class="text-sm font-medium" style="color: #3c2f2f;">Smart Watch</p>
-                                            <p class="text-xs" style="color: #8b7e7a;">INV-004</p>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">Electronics</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">0</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">$0</td>
-                                    <td class="py-4">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #dc2626; color: white;">
-                                            Out of Stock
-                                        </span>
-                                    </td>
-                                    <td class="py-4">
-                                        <i class="fas fa-ellipsis-v text-sm" style="color: #8b7e7a;"></i>
-                                    </td>
-                                </tr>
-                                <tr class="border-b" style="border-color: rgba(139,126,122,0.1);">
-                                    <td class="py-4">
-                                        <div>
-                                            <p class="text-sm font-medium" style="color: #3c2f2f;">Leather Briefcase</p>
-                                            <p class="text-xs" style="color: #8b7e7a;">INV-005</p>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">Bags</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">67</td>
-                                    <td class="py-4 text-sm" style="color: #3c2f2f;">$20,100</td>
-                                    <td class="py-4">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #f3e8d3; color: #3c2f2f;">
-                                            In Stock
-                                        </span>
-                                    </td>
-                                    <td class="py-4">
-                                        <i class="fas fa-ellipsis-v text-sm" style="color: #8b7e7a;"></i>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    {% if recent_items_data %}
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b" style="border-color: rgba(139,126,122,0.2);">
+                                        <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Product</th>
+                                        <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Category</th>
+                                        <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Stock</th>
+                                        <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Value</th>
+                                        <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;">Status</th>
+                                        <th class="text-left py-3 text-sm font-medium" style="color: #8b7e7a;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item_data in recent_items_data %}
+                                    <tr class="border-b" style="border-color: rgba(139,126,122,0.1);">
+                                        <td class="py-4">
+                                            <div>
+                                                <p class="text-sm font-medium" style="color: #3c2f2f;">{{ item_data.item.name }}</p>
+                                                <p class="text-xs" style="color: #8b7e7a;">{{ item_data.item.code }}</p>
+                                            </div>
+                                        </td>
+                                        <td class="py-4 text-sm" style="color: #3c2f2f;">{{ item_data.item.get_category_display }}</td>
+                                        <td class="py-4 text-sm" style="color: #3c2f2f;">{{ item_data.current_stock|floatformat:2 }} {{ item_data.item.unit }}</td>
+                                        <td class="py-4 text-sm" style="color: #3c2f2f;">₱{{ item_data.value|floatformat:2 }}</td>
+                                        <td class="py-4">
+                                            {% if item_data.status_class == 'danger' %}
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #dc2626; color: white;">
+                                                    {{ item_data.status }}
+                                                </span>
+                                            {% elif item_data.status_class == 'warning' %}
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #d4a574; color: #3c2f2f;">
+                                                    {{ item_data.status }}
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style="background: #f3e8d3; color: #3c2f2f;">
+                                                    {{ item_data.status }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-4">
+                                            <a href="{% url 'inventory:item_detail' item_data.item.id %}" class="text-sm" style="color: #8b7e7a;">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-center py-8" style="color: #8b7e7a;">No items found. Start by adding items to your inventory.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -299,74 +269,46 @@
                     <p class="text-sm" style="color: #8b7e7a;">Latest system updates</p>
                 </div>
                 <div class="card-body" style="padding: 1.5rem;">
-                    <div class="space-y-4" style="max-height: 400px; overflow-y: auto;">
-                        <div class="flex items-start space-x-3">
-                            <div class="flex-shrink-0">
-                                <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
-                                    <i class="fas fa-box text-white text-xs"></i>
+                    {% if recent_activities %}
+                        <div class="space-y-4" style="max-height: 400px; overflow-y: auto;">
+                            {% for activity in recent_activities %}
+                                <div class="flex items-start space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
+                                            {% if activity.action_type == 'create' %}
+                                                <i class="fas fa-plus text-white text-xs"></i>
+                                            {% elif activity.action_type == 'update' %}
+                                                <i class="fas fa-edit text-white text-xs"></i>
+                                            {% elif activity.action_type == 'delete' %}
+                                                <i class="fas fa-trash text-white text-xs"></i>
+                                            {% elif activity.action_type == 'login' %}
+                                                <i class="fas fa-sign-in-alt text-white text-xs"></i>
+                                            {% elif activity.action_type == 'logout' %}
+                                                <i class="fas fa-sign-out-alt text-white text-xs"></i>
+                                            {% elif activity.action_type == 'permission_grant' %}
+                                                <i class="fas fa-key text-white text-xs"></i>
+                                            {% elif activity.action_type == 'permission_revoke' %}
+                                                <i class="fas fa-lock text-white text-xs"></i>
+                                            {% else %}
+                                                <i class="fas fa-info text-white text-xs"></i>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium" style="color: #3c2f2f;">
+                                            {{ activity.description|truncatewords:10 }}
+                                        </p>
+                                        <p class="text-xs" style="color: #8b7e7a;">
+                                            {% if activity.user %}{{ activity.user.username }} - {% endif %}
+                                            {{ activity.timestamp|timesince }} ago
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium" style="color: #3c2f2f;">Stock updated for Premium Wallet</p>
-                                <p class="text-xs" style="color: #8b7e7a;">2 minutes ago</p>
-                            </div>
+                            {% endfor %}
                         </div>
-                        <div class="flex items-start space-x-3">
-                            <div class="flex-shrink-0">
-                                <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
-                                    <i class="fas fa-clock text-white text-xs"></i>
-                                </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium" style="color: #3c2f2f;">New shipment received</p>
-                                <p class="text-xs" style="color: #8b7e7a;">1 hour ago</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start space-x-3">
-                            <div class="flex-shrink-0">
-                                <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
-                                    <i class="fas fa-exclamation-circle text-white text-xs"></i>
-                                </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium" style="color: #3c2f2f;">Low stock alert: Designer Sunglasses</p>
-                                <p class="text-xs" style="color: #8b7e7a;">3 hours ago</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start space-x-3">
-                            <div class="flex-shrink-0">
-                                <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
-                                    <i class="fas fa-chart-line text-white text-xs"></i>
-                                </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium" style="color: #3c2f2f;">Sales increased by 12%</p>
-                                <p class="text-xs" style="color: #8b7e7a;">5 hours ago</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start space-x-3">
-                            <div class="flex-shrink-0">
-                                <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
-                                    <i class="fas fa-shopping-cart text-white text-xs"></i>
-                                </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium" style="color: #3c2f2f;">New order processed</p>
-                                <p class="text-xs" style="color: #8b7e7a;">6 hours ago</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start space-x-3">
-                            <div class="flex-shrink-0">
-                                <div class="h-8 w-8 rounded-full flex items-center justify-center" style="background: #8b7e7a;">
-                                    <i class="fas fa-user text-white text-xs"></i>
-                                </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium" style="color: #3c2f2f;">User login: John Doe</p>
-                                <p class="text-xs" style="color: #8b7e7a;">8 hours ago</p>
-                            </div>
-                        </div>
-                    </div>
+                    {% else %}
+                        <p class="text-sm text-center py-8" style="color: #8b7e7a;">No recent activity to display.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>

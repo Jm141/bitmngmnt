@@ -1,0 +1,158 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Order {{ order.order_no }} - Supplier Portal - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-file-alt me-2"></i>Purchase Order: {{ order.order_no }}</h2>
+            <p class="text-muted">{{ supplier.name }}</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:supplier_orders' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Orders
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Order Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order No:</strong> {{ order.order_no }}</p>
+                            <p><strong>Status:</strong> 
+                                {% if order.status == 'pending' %}
+                                    <span class="badge bg-warning">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'approved' %}
+                                    <span class="badge bg-info">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'shipped' %}
+                                    <span class="badge bg-primary">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'received' %}
+                                    <span class="badge bg-success">{{ order.get_status_display }}</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Order Date:</strong> {{ order.order_date|date:"Y-m-d H:i" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Expected Delivery:</strong> 
+                                {% if order.expected_delivery_date %}
+                                    {{ order.expected_delivery_date|date:"Y-m-d" }}
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Total Amount:</strong> <span class="text-success fw-bold">₱{{ order.total_amount|floatformat:2 }}</span></p>
+                        </div>
+                    </div>
+                    {% if order.notes %}
+                        <hr>
+                        <p><strong>Customer Notes:</strong></p>
+                        <p>{{ order.notes }}</p>
+                    {% endif %}
+                    {% if order.supplier_notes %}
+                        <hr>
+                        <p><strong>Your Notes:</strong></p>
+                        <p>{{ order.supplier_notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Quantity</th>
+                                    <th>Unit</th>
+                                    <th>Unit Price</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order_items %}
+                                    <tr>
+                                        <td>{{ item.item.name }}</td>
+                                        <td>{{ item.qty_ordered }}</td>
+                                        <td>{{ item.get_unit_display }}</td>
+                                        <td>₱{{ item.unit_price|floatformat:2 }}</td>
+                                        <td>₱{{ item.subtotal|floatformat:2 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-active">
+                                    <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                    <td><strong>₱{{ order.total_amount|floatformat:2 }}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code & Actions -->
+        <div class="col-md-4">
+            <!-- QR Code -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ qr_code_image }}" alt="QR Code" class="img-fluid mb-3" style="max-width: 250px;">
+                    <p class="small text-muted mb-2">Print and attach to shipment</p>
+                    <p class="small"><code>{{ order.qr_code }}</code></p>
+                    <button onclick="window.print()" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-print me-2"></i>Print QR Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.can_be_approved %}
+                        <a href="{% url 'inventory:supplier_order_approve' order.id %}" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-check me-2"></i>Approve Order
+                        </a>
+                    {% endif %}
+
+                    {% if order.can_be_shipped %}
+                        <form method="post" action="{% url 'inventory:supplier_order_ship' order.id %}" class="mb-2">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-shipping-fast me-2"></i>Mark as Shipped
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    {% if order.status == 'received' %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            This order has been received by the customer.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

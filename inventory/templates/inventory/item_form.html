@@ -26,42 +26,29 @@
                     <form method="post">
                         {% csrf_token %}
                         
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
-                                    {{ form.code }}
-                                    {% if form.code.errors %}
-                                        <div class="text-danger">
-                                            {% for error in form.code.errors %}
-                                                <small>{{ error }}</small>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
+                        <div class="alert alert-info" style="background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af;">
+                            <i class="fas fa-info-circle"></i> <strong>Note:</strong> Item code will be auto-generated in format YYYYMM0001 (e.g., 2025100001)
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }} <span class="text-danger">*</span></label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.name.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
-                                    {{ form.name }}
-                                    {% if form.name.errors %}
-                                        <div class="text-danger">
-                                            {% for error in form.name.errors %}
-                                                <small>{{ error }}</small>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
+                            {% endif %}
                         </div>
 
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
+                                    <label for="{{ form.category.id_for_label }}" class="form-label">{{ form.category.label }} <span class="text-danger">*</span></label>
                                     {{ form.category }}
                                     {% if form.category.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.category.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -71,10 +58,10 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.unit.id_for_label }}">{{ form.unit.label }}</label>
+                                    <label for="{{ form.unit.id_for_label }}" class="form-label">{{ form.unit.label }} <span class="text-danger">*</span></label>
                                     {{ form.unit }}
                                     {% if form.unit.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.unit.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -85,10 +72,10 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                            <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
                             {{ form.description }}
                             {% if form.description.errors %}
-                                <div class="text-danger">
+                                <div class="text-danger mt-1">
                                     {% for error in form.description.errors %}
                                         <small>{{ error }}</small>
                                     {% endfor %}
@@ -99,10 +86,11 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.reorder_level.id_for_label }}">{{ form.reorder_level.label }}</label>
+                                    <label for="{{ form.reorder_level.id_for_label }}" class="form-label">{{ form.reorder_level.label }}</label>
                                     {{ form.reorder_level }}
+                                    <small class="form-text text-muted">Minimum stock level before reorder alert</small>
                                     {% if form.reorder_level.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.reorder_level.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -112,10 +100,11 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.min_order_qty.id_for_label }}">{{ form.min_order_qty.label }}</label>
+                                    <label for="{{ form.min_order_qty.id_for_label }}" class="form-label">{{ form.min_order_qty.label }}</label>
                                     {{ form.min_order_qty }}
+                                    <small class="form-text text-muted">Minimum quantity to order</small>
                                     {% if form.min_order_qty.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.min_order_qty.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -145,10 +134,11 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.shelf_life_days.id_for_label }}">{{ form.shelf_life_days.label }}</label>
+                                    <label for="{{ form.shelf_life_days.id_for_label }}" class="form-label">{{ form.shelf_life_days.label }}</label>
                                     {{ form.shelf_life_days }}
+                                    <small class="form-text text-muted">Number of days before expiration (0 for non-perishable)</small>
                                     {% if form.shelf_life_days.errors %}
-                                        <div class="text-danger">
+                                        <div class="text-danger mt-1">
                                             {% for error in form.shelf_life_days.errors %}
                                                 <small>{{ error }}</small>
                                             {% endfor %}
@@ -201,22 +191,22 @@
                     <h6 class="m-0 font-weight-bold text-info">Help</h6>
                 </div>
                 <div class="card-body">
-                    <h6>Item Code</h6>
-                    <p class="text-muted small">Unique identifier for the item. Use uppercase letters and numbers.</p>
+                    <h6><i class="fas fa-barcode"></i> Auto-Generated Code</h6>
+                    <p class="text-muted small">Item codes are automatically generated in format <strong>YYYYMM0001</strong> where YYYY is the year, MM is the month, and the last 4 digits are sequential. Example: <code>2025100001</code> for the first item in October 2025.</p>
                     
-                    <h6>Category</h6>
-                    <ul class="text-muted small">
+                    <h6><i class="fas fa-tag"></i> Category</h6>
+                    <ul class="text-muted small mb-3">
                         <li><strong>Ingredient:</strong> Raw materials used in production</li>
                         <li><strong>Finished Good:</strong> Final products ready for sale</li>
                         <li><strong>Packaging:</strong> Materials used for packaging</li>
                         <li><strong>Equipment:</strong> Tools and equipment</li>
                     </ul>
                     
-                    <h6>Reorder Level</h6>
-                    <p class="text-muted small">Minimum stock level before triggering reorder alerts.</p>
+                    <h6><i class="fas fa-exclamation-triangle"></i> Reorder Level</h6>
+                    <p class="text-muted small">Minimum stock level before triggering reorder alerts. Set this based on your typical usage rate and supplier lead time.</p>
                     
-                    <h6>Perishable Items</h6>
-                    <p class="text-muted small">Items that expire should have shelf life days set. The system will use FEFO (First Expiry, First Out) for these items.</p>
+                    <h6><i class="fas fa-clock"></i> Perishable Items</h6>
+                    <p class="text-muted small">Check "Is perishable" for items that expire and set shelf life days. The system will use FEFO (First Expiry, First Out) for inventory management.</p>
                 </div>
             </div>
         </div>

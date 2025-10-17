@@ -121,6 +121,42 @@ def admin_required(view_func):
     return wrapper
 
 
+def supplier_required(view_func):
+    """
+    Decorator to require supplier account access
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('inventory:supplier_login')
+        
+        if not request.user.is_supplier_user():
+            messages.error(request, "You don't have permission to access this page. Supplier access required.")
+            return redirect('inventory:login')
+        
+        return view_func(request, *args, **kwargs)
+    
+    return wrapper
+
+
+def supplier_or_admin_required(view_func):
+    """
+    Decorator to require supplier OR admin access
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('inventory:login')
+        
+        if not (request.user.is_supplier_user() or request.user.role in ['admin', 'super_admin']):
+            messages.error(request, "You don't have permission to access this page.")
+            return redirect('inventory:dashboard')
+        
+        return view_func(request, *args, **kwargs)
+    
+    return wrapper
+
+
 class SecureViewMixin:
     """
     Mixin for secure views with CSRF protection and audit logging
@@ -149,19 +185,35 @@ def validate_user_input(data, required_fields=None):
             if field not in data or not data[field]:
                 return False, f"Field '{field}' is required"
     
-    # Check for potential SQL injection patterns
+    # Check for potential SQL injection patterns (more targeted)
     dangerous_patterns = [
-        ';', '--', '/*', '*/', 'xp_', 'sp_', 'exec', 'execute',
-        'union', 'select', 'insert', 'update', 'delete', 'drop',
-        'create', 'alter', 'script', '<script', 'javascript:'
+        ('--;', 'SQL comment'),
+        ('/*', 'SQL comment block'),
+        ('*/', 'SQL comment block'),
+        ('xp_', 'SQL extended procedure'),
+        ('sp_', 'SQL stored procedure'),
+        (' exec ', 'SQL execution'),
+        (' execute ', 'SQL execution'),
+        (' union ', 'SQL union'),
+        (' select ', 'SQL select'),
+        (' insert ', 'SQL insert'),
+        (' update ', 'SQL update'),
+        (' delete ', 'SQL delete'),
+        (' drop ', 'SQL drop'),
+        (' create ', 'SQL create'),
+        (' alter ', 'SQL alter'),
+        ('<script', 'XSS script tag'),
+        ('javascript:', 'XSS javascript'),
+        ('onerror=', 'XSS event handler'),
+        ('onload=', 'XSS event handler'),
     ]
     
     for key, value in data.items():
         if isinstance(value, str):
             value_lower = value.lower()
-            for pattern in dangerous_patterns:
+            for pattern, description in dangerous_patterns:
                 if pattern in value_lower:
-                    return False, f"Invalid input detected in field '{key}'"
+                    return False, f"Invalid input detected in field '{key}': {description}"
     
     return True, "Valid input"
 

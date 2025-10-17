@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-*(@lt+#fl=^f7wjhn4%)uow@k7$6@$*(ocm-y8$&rtkb*=%z+4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', '192.168.137.1', '192.168.*.*', '10.0.*.*', '*']
 
 
 # Application definition
@@ -140,8 +140,21 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
 # CSRF Protection
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+# Set to False for local development (HTTP)
+# Set to True for production (HTTPS)
+CSRF_COOKIE_SECURE = False  # Changed for local development
+SESSION_COOKIE_SECURE = False  # Changed for local development
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cookies across same-site requests
+CSRF_USE_SESSIONS = False  # Use cookies instead of sessions
+CSRF_COOKIE_DOMAIN = None  # Allow all domains in ALLOWED_HOSTS
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://192.168.137.1:8000',
+    'http://192.168.0.0:8000',
+    'http://192.168.1.0:8000',
+]
 
 # Additional Security Headers
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'

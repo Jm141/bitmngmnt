@@ -68,6 +68,7 @@ class User(AbstractUser):
         ('super_admin', 'Super Admin'),
         ('admin', 'Admin'),
         ('staff', 'Staff'),
+        ('supplier', 'Supplier'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -79,6 +80,9 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_users')
+    
+    # Supplier-specific fields
+    supplier = models.OneToOneField('Supplier', on_delete=models.SET_NULL, null=True, blank=True, related_name='user_account', help_text="Link to supplier if this is a supplier account")
     
     objects = UserManager()
     
@@ -113,6 +117,16 @@ class User(AbstractUser):
     def can_give_admin_access(self):
         """Check if user can give admin access (only super admin)"""
         return self.role == 'super_admin'
+    
+    def is_supplier_user(self):
+        """Check if user is a supplier account"""
+        return self.role == 'supplier' and self.supplier is not None
+    
+    def get_supplier_orders(self):
+        """Get purchase orders for this supplier user"""
+        if self.is_supplier_user():
+            return PurchaseOrder.objects.filter(supplier=self.supplier).order_by('-created_at')
+        return PurchaseOrder.objects.none()
     
     def get_age(self):
         """Calculate age from birthday"""
@@ -354,7 +368,7 @@ class Item(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    code = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=50, unique=True, blank=True)
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     unit = models.CharField(max_length=10, choices=UNIT_CHOICES)
@@ -382,6 +396,33 @@ class Item(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+    
+    @staticmethod
+    def generate_item_code():
+        """Generate item code in format YYYYMM0001"""
+        from django.utils import timezone
+        now = timezone.now()
+        prefix = now.strftime('%Y%m')  # e.g., 202510 for October 2025
+        
+        # Get the last item code with this prefix
+        last_item = Item.objects.filter(code__startswith=prefix).order_by('code').last()
+        
+        if last_item:
+            # Extract the numeric part and increment
+            last_number = int(last_item.code[-4:])
+            new_number = last_number + 1
+        else:
+            # First item of the month
+            new_number = 1
+        
+        # Format: YYYYMM0001
+        return f"{prefix}{new_number:04d}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not provided (new item)
+        if not self.code:
+            self.code = self.generate_item_code()
+        super().save(*args, **kwargs)
 
     def get_current_stock(self):
         """Get current total stock quantity"""
@@ -552,3 +593,180 @@ class RecipeItem(models.Model):
         """Get quantity adjusted for loss factor"""
         loss_multiplier = 1 + (float(self.loss_factor) / 100)
         return float(self.qty) * loss_multiplier
+
+
+# --- PURCHASE ORDER MODELS ---
+
+class PurchaseOrder(models.Model):
+    """
+    Purchase Order model for supplier pre-orders with QR code tracking
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved by Supplier'),
+        ('shipped', 'Shipped'),
+        ('received', 'Received'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_no = models.CharField(max_length=100, unique=True, blank=True)
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='purchase_orders')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    qr_code = models.CharField(max_length=255, unique=True, blank=True, help_text="Unique QR code for order tracking")
+    
+    # Order details
+    order_date = models.DateTimeField(auto_now_add=True)
+    expected_delivery_date = models.DateField(null=True, blank=True, help_text="Set by supplier during approval")
+    actual_delivery_date = models.DateField(null=True, blank=True)
+    
+    # Supplier response
+    supplier_notes = models.TextField(blank=True, null=True, help_text="Notes from supplier")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    
+    # Internal tracking
+    notes = models.TextField(blank=True, null=True)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_purchase_orders')
+    received_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='received_purchase_orders')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'purchase_order'
+        verbose_name = 'Purchase Order'
+        verbose_name_plural = 'Purchase Orders'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"PO-{self.order_no} - {self.supplier.name} ({self.get_status_display()})"
+    
+    @staticmethod
+    def generate_order_no():
+        """Generate unique order number in format PO-YYYYMMDD-XXXX"""
+        from django.utils import timezone
+        now = timezone.now()
+        prefix = f"PO-{now.strftime('%Y%m%d')}"
+        
+        # Get the last order with this prefix
+        last_order = PurchaseOrder.objects.filter(order_no__startswith=prefix).order_by('order_no').last()
+        
+        if last_order:
+            # Extract the numeric part and increment
+            last_number = int(last_order.order_no.split('-')[-1])
+            new_number = last_number + 1
+        else:
+            # First order of the day
+            new_number = 1
+        
+        return f"{prefix}-{new_number:04d}"
+    
+    def generate_qr_code(self):
+        """Generate unique QR code for order tracking"""
+        import hashlib
+        import time
+        
+        # Create unique string from order details
+        unique_string = f"{self.id}-{self.order_no}-{time.time()}"
+        qr_hash = hashlib.sha256(unique_string.encode()).hexdigest()[:16]
+        
+        return f"PO-{qr_hash.upper()}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-generate order number if not provided
+        if not self.order_no:
+            self.order_no = self.generate_order_no()
+        
+        # Auto-generate QR code if not provided
+        if not self.qr_code:
+            self.qr_code = self.generate_qr_code()
+        
+        super().save(*args, **kwargs)
+    
+    def calculate_total(self):
+        """Calculate total order amount"""
+        total = sum(item.subtotal() for item in self.order_items.all())
+        return total
+    
+    def can_be_approved(self):
+        """Check if order can be approved"""
+        return self.status in ['draft', 'pending']
+    
+    def can_be_shipped(self):
+        """Check if order can be marked as shipped"""
+        return self.status == 'approved'
+    
+    def can_be_received(self):
+        """Check if order can be received"""
+        return self.status == 'shipped'
+    
+    def approve_order(self, supplier_notes=None, expected_delivery_date=None):
+        """Approve order (supplier action)"""
+        if not self.can_be_approved():
+            raise ValueError("Order cannot be approved in current status")
+        
+        self.status = 'approved'
+        self.approved_at = timezone.now()
+        if supplier_notes:
+            self.supplier_notes = supplier_notes
+        if expected_delivery_date:
+            self.expected_delivery_date = expected_delivery_date
+        self.save()
+    
+    def mark_shipped(self):
+        """Mark order as shipped"""
+        if not self.can_be_shipped():
+            raise ValueError("Order cannot be shipped in current status")
+        
+        self.status = 'shipped'
+        self.shipped_at = timezone.now()
+        self.save()
+    
+    def mark_received(self, user):
+        """Mark order as received"""
+        if not self.can_be_received():
+            raise ValueError("Order cannot be received in current status")
+        
+        self.status = 'received'
+        self.received_at = timezone.now()
+        self.actual_delivery_date = timezone.now().date()
+        self.received_by = user
+        self.save()
+
+
+class PurchaseOrderItem(models.Model):
+    """
+    Purchase Order Item - individual items in a purchase order
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='order_items')
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name='purchase_order_items')
+    qty_ordered = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=10, choices=Item.UNIT_CHOICES)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Price set by supplier during approval")
+    qty_received = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    notes = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        db_table = 'purchase_order_item'
+        verbose_name = 'Purchase Order Item'
+        verbose_name_plural = 'Purchase Order Items'
+        unique_together = ['purchase_order', 'item']
+    
+    def __str__(self):
+        return f"{self.purchase_order.order_no} - {self.item.name} ({self.qty_ordered} {self.unit})"
+    
+    def subtotal(self):
+        """Calculate subtotal for this item"""
+        return self.qty_ordered * self.unit_price
+    
+    def is_fully_received(self):
+        """Check if full quantity has been received"""
+        return self.qty_received >= self.qty_ordered
+    
+    def remaining_qty(self):
+        """Calculate remaining quantity to receive"""
+        return self.qty_ordered - self.qty_received

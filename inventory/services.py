@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
-from .models import Item, StockLot, StockMovement, Recipe, RecipeItem, Supplier
+from .models import Item, StockLot, StockMovement, Recipe, RecipeItem, Supplier, PurchaseOrder, PurchaseOrderItem
 
 
 class InventoryService:
@@ -35,7 +35,7 @@ class InventoryService:
         if qty_needed:
             # Filter lots that have enough quantity
             available_lots = []
-            remaining_qty = qty_needed
+            remaining_qty = Decimal(str(qty_needed))
             
             for lot in lots:
                 if remaining_qty <= 0:
@@ -56,7 +56,7 @@ class InventoryService:
         """
         lots = InventoryService.get_available_lots(item, qty_needed)
         consumption_plan = []
-        remaining_qty = qty_needed
+        remaining_qty = Decimal(str(qty_needed))
         
         for lot in lots:
             if remaining_qty <= 0:
@@ -78,6 +78,8 @@ class InventoryService:
         """
         Consume stock from inventory
         """
+        qty = Decimal(str(qty))
+        
         if lot:
             # Consume from specific lot
             if lot.qty < qty:
@@ -228,6 +230,8 @@ class InventoryService:
         """
         Adjust stock (increase or decrease)
         """
+        qty = Decimal(str(qty))
+        
         if lot:
             # Adjust specific lot
             lot.qty += qty
@@ -414,3 +418,171 @@ class RecipeService:
             validation_result['total_cost'] += Decimal(str(qty_needed)) * ingredient_cost
         
         return validation_result
+
+
+class PurchaseOrderService:
+    """
+    Service class for purchase order management
+    """
+    
+    @staticmethod
+    @transaction.atomic
+    def create_purchase_order(supplier, items_data, user, notes=None, expected_delivery_date=None):
+        """
+        Create a new purchase order with multiple items
+        items_data: list of dict with keys: item, qty, unit_price
+        """
+        # Create purchase order
+        po = PurchaseOrder.objects.create(
+            supplier=supplier,
+            created_by=user,
+            notes=notes,
+            expected_delivery_date=expected_delivery_date,
+            status='pending'
+        )
+        
+        # Create order items
+        total_amount = Decimal('0.00')
+        for item_data in items_data:
+            po_item = PurchaseOrderItem.objects.create(
+                purchase_order=po,
+                item=item_data['item'],
+                qty_ordered=item_data['qty'],
+                unit=item_data['item'].unit,
+                unit_price=item_data.get('unit_price', 0),
+                notes=item_data.get('notes', '')
+            )
+            total_amount += po_item.subtotal()
+        
+        # Update total amount
+        po.total_amount = total_amount
+        po.save()
+        
+        return po
+    
+    @staticmethod
+    @transaction.atomic
+    def approve_purchase_order(po, supplier_notes=None, expected_delivery_date=None):
+        """
+        Approve purchase order (supplier action)
+        """
+        po.approve_order(supplier_notes=supplier_notes, expected_delivery_date=expected_delivery_date)
+        return po
+    
+    @staticmethod
+    @transaction.atomic
+    def ship_purchase_order(po):
+        """
+        Mark purchase order as shipped
+        """
+        po.mark_shipped()
+        return po
+    
+    @staticmethod
+    @transaction.atomic
+    def receive_purchase_order_by_qr(qr_code, user):
+        """
+        Receive purchase order by scanning QR code
+        Automatically creates stock lots for all items in the order
+        """
+        try:
+            po = PurchaseOrder.objects.get(qr_code=qr_code)
+        except PurchaseOrder.DoesNotExist:
+            raise ValueError("Invalid QR code. Purchase order not found.")
+        
+        if not po.can_be_received():
+            raise ValueError(f"Purchase order cannot be received. Current status: {po.get_status_display()}")
+        
+        # Mark order as received
+        po.mark_received(user)
+        
+        # Auto-receive all items as stock lots
+        received_lots = []
+        for po_item in po.order_items.all():
+            # Generate lot number
+            lot_no = f"{po.order_no}-{po_item.item.code}"
+            
+            # Calculate expiry date if item is perishable
+            expires_at = None
+            if po_item.item.is_perishable and po_item.item.shelf_life_days > 0:
+                expires_at = timezone.now().date() + timedelta(days=po_item.item.shelf_life_days)
+            
+            # Create stock lot
+            lot = InventoryService.receive_stock(
+                item=po_item.item,
+                lot_no=lot_no,
+                qty=po_item.qty_ordered,
+                unit=po_item.unit,
+                user=user,
+                supplier=po.supplier,
+                expires_at=expires_at,
+                unit_cost=po_item.unit_price,
+                ref_no=po.order_no,
+                notes=f"Received from PO: {po.order_no}"
+            )
+            
+            # Update qty_received
+            po_item.qty_received = po_item.qty_ordered
+            po_item.save()
+            
+            received_lots.append(lot)
+        
+        return po, received_lots
+    
+    @staticmethod
+    def generate_qr_code_image(qr_code):
+        """
+        Generate QR code image for a purchase order
+        Returns base64 encoded image
+        """
+        import qrcode
+        from io import BytesIO
+        import base64
+        
+        # Create QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_code)
+        qr.make(fit=True)
+        
+        # Create image
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+        
+        return f"data:image/png;base64,{img_base64}"
+    
+    @staticmethod
+    def get_pending_orders():
+        """
+        Get all pending purchase orders
+        """
+        return PurchaseOrder.objects.filter(status='pending').order_by('-created_at')
+    
+    @staticmethod
+    def get_shipped_orders():
+        """
+        Get all shipped purchase orders waiting to be received
+        """
+        return PurchaseOrder.objects.filter(status='shipped').order_by('-shipped_at')
+    
+    @staticmethod
+    def get_order_summary():
+        """
+        Get purchase order summary statistics
+        """
+        return {
+            'total_orders': PurchaseOrder.objects.count(),
+            'pending_orders': PurchaseOrder.objects.filter(status='pending').count(),
+            'approved_orders': PurchaseOrder.objects.filter(status='approved').count(),
+            'shipped_orders': PurchaseOrder.objects.filter(status='shipped').count(),
+            'received_orders': PurchaseOrder.objects.filter(status='received').count(),
+        }
