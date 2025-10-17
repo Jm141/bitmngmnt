@@ -146,6 +146,29 @@ class User(AbstractUser):
     def age(self):
         """Property to get age"""
         return self.get_age()
+    
+    def has_permission(self, permission_type):
+        """
+        Check if user has a specific permission
+        Admin and Super Admin have all permissions by default
+        Staff users need explicit permission grants
+        """
+        # Admin and Super Admin have all permissions
+        if self.role in ['admin', 'super_admin']:
+            return True
+        
+        # Supplier has limited permissions
+        if self.role == 'supplier':
+            return False
+        
+        # Staff users need explicit permissions
+        if self.role == 'staff':
+            return self.user_accesses.filter(
+                permission_type=permission_type,
+                is_active=True
+            ).exists()
+        
+        return False
 
 
 class UserLinks(models.Model):

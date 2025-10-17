@@ -60,91 +60,246 @@
         </div>
     </div>
 
-    <!-- Attendance History -->
+    <!-- Calendar View -->
     <div class="card">
         <div class="card-header">
-            <h3 class="text-lg font-semibold">Attendance History (Last 30 Days)</h3>
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Attendance Calendar</h3>
+                <div class="flex items-center gap-2">
+                    <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <span class="text-sm font-medium px-4">{{ current_month }} {{ current_year }}</span>
+                    <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
         </div>
         <div class="card-body">
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Date</th>
-                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">AM In</th>
-                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">AM Out</th>
-                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">PM In</th>
-                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">PM Out</th>
-                            <th class="text-left py-3 text-sm font-medium text-muted-foreground">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for rec in records %}
-                        <tr class="border-b">
-                            <td class="py-3 text-sm font-medium">{{ rec.date|date:"M d, Y" }}</td>
-                            <td class="py-3 text-sm">
-                                {% if rec.time_in_am %}
-                                    <span class="text-green-600">{{ rec.time_in_am|date:"g:i A" }}</span>
-                                {% else %}
-                                    <span class="text-muted-foreground">-</span>
+            <!-- Calendar Grid -->
+            <div class="calendar-grid">
+                <!-- Day Headers -->
+                <div class="calendar-header">
+                    <div class="calendar-day-header">Sun</div>
+                    <div class="calendar-day-header">Mon</div>
+                    <div class="calendar-day-header">Tue</div>
+                    <div class="calendar-day-header">Wed</div>
+                    <div class="calendar-day-header">Thu</div>
+                    <div class="calendar-day-header">Fri</div>
+                    <div class="calendar-day-header">Sat</div>
+                </div>
+                
+                <!-- Calendar Days -->
+                {% for week in calendar_weeks %}
+                    {% for day_data in week %}
+                        {% if day_data.day == 0 %}
+                            <div class="calendar-day empty"></div>
+                        {% else %}
+                            <div class="calendar-day {% if day_data.is_today %}today{% endif %} {% if day_data.is_complete %}complete{% elif day_data.is_partial %}partial{% elif day_data.has_record %}absent{% endif %}" 
+                                 data-date="{{ day_data.date|date:'Y-m-d' }}"
+                                 onclick="showAttendanceDetail('{{ day_data.date|date:'Y-m-d' }}', {{ day_data.has_record|yesno:'true,false' }})">
+                                <div class="calendar-day-number">{{ day_data.day }}</div>
+                                {% if day_data.has_record %}
+                                    <div class="calendar-day-indicator">
+                                        {% if day_data.is_complete %}
+                                            <i class="fas fa-check-circle text-green-600"></i>
+                                        {% elif day_data.is_partial %}
+                                            <i class="fas fa-exclamation-circle text-yellow-600"></i>
+                                        {% else %}
+                                            <i class="fas fa-times-circle text-gray-400"></i>
+                                        {% endif %}
+                                    </div>
                                 {% endif %}
-                            </td>
-                            <td class="py-3 text-sm">
-                                {% if rec.time_out_am %}
-                                    <span class="text-green-600">{{ rec.time_out_am|date:"g:i A" }}</span>
-                                {% else %}
-                                    <span class="text-muted-foreground">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3 text-sm">
-                                {% if rec.time_in_pm %}
-                                    <span class="text-green-600">{{ rec.time_in_pm|date:"g:i A" }}</span>
-                                {% else %}
-                                    <span class="text-muted-foreground">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3 text-sm">
-                                {% if rec.time_out_pm %}
-                                    <span class="text-green-600">{{ rec.time_out_pm|date:"g:i A" }}</span>
-                                {% else %}
-                                    <span class="text-muted-foreground">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3">
-                                {% if rec.is_am_complete and rec.is_pm_complete %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Complete
-                                    </span>
-                                {% elif rec.is_am_complete or rec.is_pm_complete %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                        Partial
-                                    </span>
-                                {% else %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        Absent
-                                    </span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="py-8 text-center text-muted-foreground">
-                                <i class="fas fa-calendar-times text-4xl mb-2"></i>
-                                <p>No attendance records found</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+            </div>
+            
+            <!-- Legend -->
+            <div class="mt-4 flex items-center gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-green-100 border-2 border-green-600"></div>
+                    <span>Complete</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-yellow-100 border-2 border-yellow-600"></div>
+                    <span>Partial</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-gray-100 border-2 border-gray-400"></div>
+                    <span>Absent</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded border-2 border-blue-600"></div>
+                    <span>Today</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Detail Modal -->
+    <div id="attendanceModal" class="modal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="text-lg font-semibold" id="modalTitle">Attendance Details</h3>
+                <button onclick="closeModal()" class="btn btn-sm btn-ghost">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be loaded here -->
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+    }
+    
+    .calendar-header {
+        display: contents;
+    }
+    
+    .calendar-day-header {
+        text-align: center;
+        font-weight: 600;
+        padding: 0.75rem;
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .calendar-day {
+        aspect-ratio: 1;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+        position: relative;
+    }
+    
+    .calendar-day.empty {
+        border: none;
+        cursor: default;
+        background: transparent;
+    }
+    
+    .calendar-day:not(.empty):hover {
+        border-color: #c9a27b;
+        transform: scale(1.05);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .calendar-day.today {
+        border-color: #3b82f6;
+        border-width: 3px;
+        background: #eff6ff;
+    }
+    
+    .calendar-day.complete {
+        background: #f0fdf4;
+        border-color: #16a34a;
+    }
+    
+    .calendar-day.partial {
+        background: #fefce8;
+        border-color: #ca8a04;
+    }
+    
+    .calendar-day.absent {
+        background: #f9fafb;
+        border-color: #d1d5db;
+    }
+    
+    .calendar-day-number {
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .calendar-day-indicator {
+        font-size: 1.25rem;
+    }
+    
+    .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-content {
+        position: relative;
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        max-width: 32rem;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .modal-body {
+        padding: 1rem 0;
+    }
+    
+    .time-entry {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background: #f9fafb;
+        border-radius: 0.5rem;
+    }
+    
+    .time-entry-label {
+        font-weight: 500;
+        color: #6b7280;
+    }
+    
+    .time-entry-value {
+        font-weight: 600;
+        color: #111827;
+    }
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
 (function(){
+    // Clock in/out functionality
     function post(action){
         const formData = new FormData();
         formData.append('action', action);
@@ -156,6 +311,92 @@
     var b2=document.getElementById('btn_time_out_am'); if(b2){ b2.addEventListener('click', function(){ post('time_out_am'); }); }
     var b3=document.getElementById('btn_time_in_pm'); if(b3){ b3.addEventListener('click', function(){ post('time_in_pm'); }); }
     var b4=document.getElementById('btn_time_out_pm'); if(b4){ b4.addEventListener('click', function(){ post('time_out_pm'); }); }
+    
+    // Attendance records data
+    const attendanceData = {
+        {% for date, record in records_dict.items %}
+        '{{ date|date:"Y-m-d" }}': {
+            date: '{{ date|date:"F d, Y" }}',
+            time_in_am: {% if record.time_in_am %}'{{ record.time_in_am|date:"g:i A" }}'{% else %}null{% endif %},
+            time_out_am: {% if record.time_out_am %}'{{ record.time_out_am|date:"g:i A" }}'{% else %}null{% endif %},
+            time_in_pm: {% if record.time_in_pm %}'{{ record.time_in_pm|date:"g:i A" }}'{% else %}null{% endif %},
+            time_out_pm: {% if record.time_out_pm %}'{{ record.time_out_pm|date:"g:i A" }}'{% else %}null{% endif %},
+            is_complete: {{ record.is_am_complete|yesno:"true,false" }} && {{ record.is_pm_complete|yesno:"true,false" }},
+            is_partial: ({{ record.is_am_complete|yesno:"true,false" }} || {{ record.is_pm_complete|yesno:"true,false" }}) && !({{ record.is_am_complete|yesno:"true,false" }} && {{ record.is_pm_complete|yesno:"true,false" }})
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
 })();
+
+// Modal functions
+function showAttendanceDetail(dateStr, hasRecord) {
+    const modal = document.getElementById('attendanceModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    
+    const data = attendanceData[dateStr];
+    
+    if (!hasRecord || !data) {
+        modalTitle.textContent = 'No Record';
+        modalBody.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-calendar-times text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-600">No attendance record for this date</p>
+            </div>
+        `;
+    } else {
+        modalTitle.textContent = data.date;
+        
+        let statusBadge = '';
+        if (data.is_complete) {
+            statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-2"></i>Complete</span>';
+        } else if (data.is_partial) {
+            statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800"><i class="fas fa-exclamation-circle mr-2"></i>Partial</span>';
+        } else {
+            statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800"><i class="fas fa-times-circle mr-2"></i>Absent</span>';
+        }
+        
+        modalBody.innerHTML = `
+            <div class="mb-4">
+                ${statusBadge}
+            </div>
+            <div class="space-y-2">
+                <h4 class="font-semibold text-sm text-gray-700 mb-2">Morning Shift</h4>
+                <div class="time-entry">
+                    <span class="time-entry-label">Time In (AM)</span>
+                    <span class="time-entry-value">${data.time_in_am || '-'}</span>
+                </div>
+                <div class="time-entry">
+                    <span class="time-entry-label">Time Out (AM)</span>
+                    <span class="time-entry-value">${data.time_out_am || '-'}</span>
+                </div>
+                
+                <h4 class="font-semibold text-sm text-gray-700 mb-2 mt-4">Afternoon Shift</h4>
+                <div class="time-entry">
+                    <span class="time-entry-label">Time In (PM)</span>
+                    <span class="time-entry-value">${data.time_in_pm || '-'}</span>
+                </div>
+                <div class="time-entry">
+                    <span class="time-entry-label">Time Out (PM)</span>
+                    <span class="time-entry-value">${data.time_out_pm || '-'}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closeModal() {
+    const modal = document.getElementById('attendanceModal');
+    modal.style.display = 'none';
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
 </script>
 {% endblock %}

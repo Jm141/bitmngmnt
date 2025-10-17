@@ -358,8 +358,40 @@ class PasswordChangeForm(forms.Form):
 
 class SupplierForm(forms.ModelForm):
     """
-    Form for managing suppliers
+    Form for managing suppliers with optional user account creation
     """
+    # Optional user account fields
+    create_user_account = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Create User Account for Supplier Portal",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text="Check this to create a login account for this supplier to access the supplier portal"
+    )
+    user_first_name = forms.CharField(
+        max_length=30,
+        required=False,
+        label="First Name",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Required if creating user account'})
+    )
+    user_last_name = forms.CharField(
+        max_length=30,
+        required=False,
+        label="Last Name",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Required if creating user account'})
+    )
+    user_password = forms.CharField(
+        required=False,
+        label="Password",
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Required if creating user account'}),
+        help_text="Password for supplier login"
+    )
+    user_password_confirm = forms.CharField(
+        required=False,
+        label="Confirm Password",
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm password'})
+    )
+    
     class Meta:
         model = Supplier
         fields = ['name', 'contact_person', 'phone', 'email', 'address', 'is_active']
@@ -389,6 +421,37 @@ class SupplierForm(forms.ModelForm):
             if Supplier.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
                 raise ValidationError("A supplier with this email already exists.")
         return email
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        create_account = cleaned_data.get('create_user_account')
+        
+        if create_account:
+            # Validate required fields for user account
+            first_name = cleaned_data.get('user_first_name')
+            last_name = cleaned_data.get('user_last_name')
+            password = cleaned_data.get('user_password')
+            password_confirm = cleaned_data.get('user_password_confirm')
+            email = cleaned_data.get('email')
+            
+            if not first_name:
+                raise ValidationError("First name is required when creating a user account.")
+            if not last_name:
+                raise ValidationError("Last name is required when creating a user account.")
+            if not password:
+                raise ValidationError("Password is required when creating a user account.")
+            if not password_confirm:
+                raise ValidationError("Password confirmation is required when creating a user account.")
+            if password != password_confirm:
+                raise ValidationError("Passwords do not match.")
+            if not email:
+                raise ValidationError("Email is required when creating a user account.")
+            
+            # Check if email is already used by another user
+            if User.objects.filter(email=email).exists():
+                raise ValidationError("A user with this email already exists.")
+        
+        return cleaned_data
 
 
 class ItemForm(forms.ModelForm):

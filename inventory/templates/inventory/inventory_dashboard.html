@@ -13,12 +13,13 @@
                     <!-- <a href="{% url 'inventory:stock_receive' %}" class="btn btn-success">
                         <i class="fas fa-plus"></i> Receive Stock
                     </a>
-                    <a href="{% url 'inventory:stock_consume' %}" class="btn btn-warning">
-                        <i class="fas fa-minus"></i> Use Stock
-                    </a>
+                    
                     <a href="{% url 'inventory:production_create' %}" class="btn btn-primary">
                         <i class="fas fa-industry"></i> Bake Products
                     </a> -->
+                    <a href="{% url 'inventory:stock_consume' %}" class="btn btn-warning">
+                        <i class="fas fa-minus"></i> Use Stock
+                    </a>
                 </div>
             </div>
         </div>
@@ -214,8 +215,8 @@
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">📈 Daily Bakery Activity (Last 7 Days)</h6>
                 </div>
-                <div class="card-body">
-                    <canvas id="dailyActivityChart" width="400" height="200"></canvas>
+                <div class="card-body" style="height: 400px;">
+                    <canvas id="dailyActivityChart"></canvas>
                 </div>
             </div>
         </div>
@@ -266,8 +267,8 @@
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-warning">📅 Expiry Trend (Next 30 Days)</h6>
                 </div>
-                <div class="card-body">
-                    <canvas id="expiryTrendChart" width="400" height="200"></canvas>
+                <div class="card-body" style="height: 300px;">
+                    <canvas id="expiryTrendChart"></canvas>
                 </div>
             </div>
         </div>

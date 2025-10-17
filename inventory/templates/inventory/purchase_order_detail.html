@@ -168,8 +168,11 @@
                     {% endif %}
 
                     {% if order.can_be_received %}
-                        <a href="{% url 'inventory:purchase_order_scan_receive' %}" class="btn btn-success w-100 mb-2">
-                            <i class="fas fa-qrcode me-2"></i>Scan to Receive
+                        <a href="{% url 'inventory:purchase_order_receive' order.id %}" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-box-open me-2"></i>Receive Order
+                        </a>
+                        <a href="{% url 'inventory:purchase_order_scan_receive' %}" class="btn btn-outline-success w-100 mb-2">
+                            <i class="fas fa-qrcode me-2"></i>Scan QR to Receive
                         </a>
                     {% endif %}
 

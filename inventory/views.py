@@ -159,25 +159,97 @@ def dashboard(request):
 
 @login_required
 def attendance_dashboard(request):
-    """Staff self-attendance view with today's record and calendar list."""
+    """Staff self-attendance view with today's record and calendar view."""
+    from calendar import monthcalendar, month_name
+    from datetime import datetime, timedelta
+    
     if request.user.role not in ['staff', 'admin', 'super_admin']:
         messages.error(request, "Unauthorized")
         return redirect('inventory:dashboard')
 
     today = timezone.now().date()
+    
+    # Get month/year from query params or use current
+    try:
+        year = int(request.GET.get('year', today.year))
+        month = int(request.GET.get('month', today.month))
+    except ValueError:
+        year = today.year
+        month = today.month
+    
     # Staff can only see their own; admin/super_admin can switch user via param later
     target_user = request.user
-    records = AttendanceRecord.objects.filter(user=target_user).order_by('-date')[:30]
+    
+    # Get all records for the selected month
+    month_start = datetime(year, month, 1).date()
+    if month == 12:
+        month_end = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+    else:
+        month_end = datetime(year, month + 1, 1).date() - timedelta(days=1)
+    
+    records = AttendanceRecord.objects.filter(
+        user=target_user,
+        date__gte=month_start,
+        date__lte=month_end
+    )
+    
+    # Create a dictionary for quick lookup
+    records_dict = {rec.date: rec for rec in records}
+    
+    # Get today's record
     try:
         record_today = AttendanceRecord.objects.get(user=target_user, date=today)
     except AttendanceRecord.DoesNotExist:
         record_today = None
+    
+    # Generate calendar
+    cal = monthcalendar(year, month)
+    
+    # Build calendar data with attendance info
+    calendar_weeks = []
+    for week in cal:
+        week_data = []
+        for day in week:
+            if day == 0:
+                week_data.append({'day': 0})
+            else:
+                date = datetime(year, month, day).date()
+                record = records_dict.get(date)
+                week_data.append({
+                    'day': day,
+                    'date': date,
+                    'is_today': date == today,
+                    'record': record,
+                    'has_record': record is not None,
+                    'is_complete': record.is_am_complete() and record.is_pm_complete() if record else False,
+                    'is_partial': (record.is_am_complete() or record.is_pm_complete()) and not (record.is_am_complete() and record.is_pm_complete()) if record else False,
+                })
+        calendar_weeks.append(week_data)
+    
+    # Calculate prev/next month
+    if month == 1:
+        prev_month, prev_year = 12, year - 1
+    else:
+        prev_month, prev_year = month - 1, year
+    
+    if month == 12:
+        next_month, next_year = 1, year + 1
+    else:
+        next_month, next_year = month + 1, year
 
     context = {
         'target_user': target_user,
-        'records': records,
         'record_today': record_today,
         'now': get_manila_now(),
+        'calendar_weeks': calendar_weeks,
+        'current_month': month_name[month],
+        'current_year': year,
+        'current_month_num': month,
+        'prev_month': prev_month,
+        'prev_year': prev_year,
+        'next_month': next_month,
+        'next_year': next_year,
+        'records_dict': records_dict,
     }
     return render(request, 'inventory/attendance_dashboard.html', context)
 
@@ -287,19 +359,42 @@ def user_detail(request, user_id):
     """
     user = get_object_or_404(User, id=user_id)
     
-    # Check if current user can view this user
-    if not can_manage_user(request.user, user) and request.user != user:
-        messages.error(request, "You don't have permission to view this user.")
-        return redirect('user_list')
+    # Super admin can view anyone
+    # Admin can view all users (admin, supplier, staff) except super_admin
+    # Staff can only view themselves
+    if request.user.role == 'super_admin':
+        # Super admin can view and manage anyone
+        can_view = True
+        can_edit = True
+    elif request.user.role == 'admin':
+        # Admin can view all users except super_admin
+        if user.role == 'super_admin':
+            messages.error(request, "You don't have permission to view Super Admin users.")
+            return redirect('inventory:user_list')
+        can_view = True
+        # Admin can only edit staff users, not other admins or suppliers
+        can_edit = (user.role == 'staff')
+    else:
+        # Staff can only view themselves
+        if request.user != user:
+            messages.error(request, "You don't have permission to view this user.")
+            return redirect('inventory:user_list')
+        can_view = True
+        can_edit = False
     
     user_accesses = UserAccess.objects.filter(user=user, is_active=True)
     user_links = UserLinks.objects.filter(user=user, is_active=True)
+    
+    # Show info message if admin is viewing another admin or supplier (read-only)
+    if request.user.role == 'admin' and user.role in ['admin', 'supplier'] and request.user != user:
+        messages.info(request, f"You are viewing this {user.get_role_display()} user in read-only mode. You can only edit Staff users.")
     
     context = {
         'target_user': user,
         'user_accesses': user_accesses,
         'user_links': user_links,
-        'can_manage': can_manage_user(request.user, user),
+        'can_manage': can_edit,  # Use can_edit instead of can_manage_user for more granular control
+        'is_read_only': not can_edit,
     }
     
     log_user_action(
@@ -358,7 +453,7 @@ def user_create(request):
             )
             
             messages.success(request, f"User {user.username} created successfully.")
-            return redirect('inventory:user_detail', user_id=user.id)
+            return redirect('inventory:user_list')
     else:
         form = UserForm()
     
@@ -380,9 +475,20 @@ def user_update(request, user_id):
     user = get_object_or_404(User, id=user_id)
     
     # Check if current user can manage this user
-    if not can_manage_user(request.user, user):
-        messages.error(request, "You don't have permission to edit this user.")
-        return redirect('user_list')
+    # Super admin can edit anyone
+    # Admin can only edit staff users
+    if request.user.role == 'super_admin':
+        # Super admin can edit anyone
+        pass
+    elif request.user.role == 'admin':
+        # Admin can only edit staff users, not other admins or suppliers
+        if user.role in ['admin', 'supplier', 'super_admin']:
+            messages.error(request, f"You don't have permission to edit {user.get_role_display()} users. You can only edit Staff users.")
+            return redirect('inventory:user_detail', user_id=user_id)
+    else:
+        # Staff cannot edit anyone
+        messages.error(request, "You don't have permission to edit users.")
+        return redirect('inventory:user_list')
     
     if request.method == 'POST':
         form = UserForm(request.POST, instance=user)
@@ -420,7 +526,7 @@ def user_update(request, user_id):
             )
             
             messages.success(request, f"User {user.username} updated successfully.")
-            return redirect('user_detail', user_id=user.id)
+            return redirect('inventory:user_detail', user_id=user.id)
     else:
         form = UserForm(instance=user)
     
@@ -456,7 +562,7 @@ def user_delete(request, user_id):
         )
         
         messages.success(request, f"User {username} deleted successfully.")
-        return redirect('user_list')
+        return redirect('inventory:user_list')
     
     context = {
         'user': user,
@@ -476,7 +582,7 @@ def user_permissions(request, user_id):
     # Check if current user can manage this user
     if not can_manage_user(request.user, user):
         messages.error(request, "You don't have permission to manage this user.")
-        return redirect('user_list')
+        return redirect('inventory:user_list')
     
     if request.method == 'POST':
         # Bulk update via checkboxes
@@ -563,7 +669,7 @@ def audit_logs(request):
     """
     if not check_user_permissions(request.user, 'reports_read'):
         messages.error(request, "You don't have permission to view audit logs.")
-        return redirect('dashboard')
+        return redirect('inventory:dashboard')
     
     logs = AuditLog.objects.all()
     
@@ -1227,7 +1333,7 @@ def supplier_list(request):
 @permission_required('inventory_write')
 def supplier_create(request):
     """
-    Create new supplier
+    Create new supplier with optional user account
     """
     if request.method == 'POST':
         form = SupplierForm(request.POST)
@@ -1235,6 +1341,49 @@ def supplier_create(request):
             supplier = form.save(commit=False)
             supplier.created_by = request.user
             supplier.save()
+            
+            # Create user account if requested
+            if form.cleaned_data.get('create_user_account'):
+                # Generate username from first and last name
+                first_name = form.cleaned_data['user_first_name']
+                last_name = form.cleaned_data['user_last_name']
+                base_username = f"{first_name.lower()}.{last_name.lower()}"
+                username = base_username
+                
+                # Check if username exists and add number if needed
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                
+                # Create the user account
+                user = User.objects.create_user(
+                    username=username,
+                    email=supplier.email,
+                    password=form.cleaned_data['user_password'],
+                    first_name=first_name,
+                    last_name=last_name,
+                    role='supplier',
+                    phone_number=supplier.phone,
+                    address=supplier.address,
+                    is_active=True
+                )
+                user.created_by = request.user
+                user.supplier = supplier
+                user.save()
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='create',
+                    target_model='User',
+                    target_id=user.id,
+                    description=f"Created supplier user account {user.username} for supplier {supplier.name}",
+                    request=request
+                )
+                
+                messages.success(request, f"Supplier {supplier.name} created successfully with user account '{username}'. They can now login to the supplier portal.")
+            else:
+                messages.success(request, f"Supplier {supplier.name} created successfully.")
             
             log_user_action(
                 user=request.user,
@@ -1245,7 +1394,6 @@ def supplier_create(request):
                 request=request
             )
             
-            messages.success(request, f"Supplier {supplier.name} created successfully.")
             return redirect('inventory:supplier_list')
     else:
         form = SupplierForm()
@@ -1352,11 +1500,41 @@ def recipe_create(request):
 @permission_required('reports_read')
 def stock_report(request):
     """
-    Stock report with filters
+    Comprehensive stock report with date range, consumption tracking, and analytics
     """
+    from datetime import datetime, timedelta
+    from django.db.models import Sum, Count, Q
+    from decimal import Decimal
+    
     # Get filters
     category_filter = request.GET.get('category', '')
     low_stock_only = request.GET.get('low_stock', False)
+    report_type = request.GET.get('report_type', 'current')  # current, monthly, yearly
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    # Set default date range based on report type
+    today = timezone.now().date()
+    if report_type == 'monthly' and not date_from:
+        date_from = (today.replace(day=1)).strftime('%Y-%m-%d')
+        date_to = today.strftime('%Y-%m-%d')
+    elif report_type == 'yearly' and not date_from:
+        date_from = (today.replace(month=1, day=1)).strftime('%Y-%m-%d')
+        date_to = today.strftime('%Y-%m-%d')
+    
+    # Parse dates
+    start_date = None
+    end_date = None
+    if date_from:
+        try:
+            start_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            end_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except ValueError:
+            pass
     
     items = Item.objects.filter(is_active=True)
     
@@ -1365,6 +1543,11 @@ def stock_report(request):
     
     # Build report data
     report_data = []
+    total_value = Decimal('0.00')
+    total_consumed = Decimal('0.00')
+    total_received = Decimal('0.00')
+    total_produced = Decimal('0.00')
+    
     for item in items:
         current_stock = item.get_current_stock()
         is_low_stock = item.is_low_stock()
@@ -1372,19 +1555,76 @@ def stock_report(request):
         if low_stock_only and not is_low_stock:
             continue
         
+        # Calculate consumption, receipts, and production for date range
+        movements = StockMovement.objects.filter(item=item)
+        if start_date:
+            movements = movements.filter(timestamp__date__gte=start_date)
+        if end_date:
+            movements = movements.filter(timestamp__date__lte=end_date)
+        
+        # Consumption
+        consumed = movements.filter(movement_type='consume').aggregate(
+            total=Sum('qty')
+        )['total'] or Decimal('0.00')
+        
+        # Receipts
+        received = movements.filter(movement_type='receive').aggregate(
+            total=Sum('qty')
+        )['total'] or Decimal('0.00')
+        
+        # Production
+        produced = movements.filter(movement_type='produce').aggregate(
+            total=Sum('qty')
+        )['total'] or Decimal('0.00')
+        
+        # Adjustments
+        adjusted = movements.filter(movement_type='adjust').aggregate(
+            total=Sum('qty')
+        )['total'] or Decimal('0.00')
+        
+        # Calculate value
+        unit_cost = InventoryService.calculate_item_cost(item)
+        item_value = current_stock * unit_cost
+        total_value += item_value
+        
+        # Track totals
+        total_consumed += consumed
+        total_received += received
+        total_produced += produced
+        
         report_data.append({
             'item': item,
             'current_stock': current_stock,
             'reorder_level': item.reorder_level,
             'is_low_stock': is_low_stock,
             'expiring_soon': item.get_expiring_soon().count(),
-            'unit_cost': InventoryService.calculate_item_cost(item)
+            'unit_cost': unit_cost,
+            'item_value': item_value,
+            'consumed': consumed,
+            'received': received,
+            'produced': produced,
+            'adjusted': adjusted,
         })
+    
+    # Summary statistics
+    summary = {
+        'total_items': len(report_data),
+        'low_stock_count': sum(1 for d in report_data if d['is_low_stock']),
+        'expiring_count': sum(1 for d in report_data if d['expiring_soon'] > 0),
+        'total_value': total_value,
+        'total_consumed': total_consumed,
+        'total_received': total_received,
+        'total_produced': total_produced,
+    }
     
     context = {
         'report_data': report_data,
+        'summary': summary,
         'category_filter': category_filter,
         'low_stock_only': low_stock_only,
+        'report_type': report_type,
+        'date_from': date_from,
+        'date_to': date_to,
         'category_choices': Item.CATEGORY_CHOICES,
     }
     
@@ -1469,6 +1709,103 @@ def purchase_order_detail(request, order_id):
     )
     
     return render(request, 'inventory/purchase_order_detail.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def purchase_order_receive(request, order_id):
+    """
+    Display receiving form with expiration date inputs, then process the receiving
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    # Check if order can be received
+    if order.status not in ['approved', 'shipped']:
+        messages.error(request, "This order cannot be received in its current status.")
+        return redirect('inventory:purchase_order_detail', order_id=order.id)
+    
+    if request.method == 'POST':
+        # Process the receiving
+        try:
+            order_items = order.order_items.all()
+            
+            for item in order_items:
+                qty_received = request.POST.get(f'qty_received_{item.id}')
+                lot_no = request.POST.get(f'lot_no_{item.id}')
+                expires_at = request.POST.get(f'expires_at_{item.id}')
+                notes = request.POST.get(f'notes_{item.id}', '')
+                
+                if qty_received and float(qty_received) > 0:
+                    # Create stock lot
+                    stock_lot = StockLot.objects.create(
+                        item=item.item,
+                        lot_no=lot_no,
+                        qty=qty_received,
+                        unit=item.unit,
+                        expires_at=expires_at if expires_at else None,
+                        unit_cost=item.unit_price,
+                        supplier=order.supplier,
+                        notes=notes,
+                        created_by=request.user
+                    )
+                    
+                    # Create stock movement
+                    StockMovement.objects.create(
+                        item=item.item,
+                        lot=stock_lot,
+                        movement_type='receive',
+                        qty=qty_received,
+                        unit=item.unit,
+                        ref_no=order.order_no,
+                        reason=f"Received from PO {order.order_no}",
+                        notes=notes,
+                        created_by=request.user
+                    )
+                    
+                    # Update order item qty_received
+                    item.qty_received = float(qty_received)
+                    item.save()
+            
+            # Update order status
+            order.status = 'received'
+            order.received_by = request.user
+            order.received_at = timezone.now()
+            order.actual_delivery_date = timezone.now().date()
+            
+            # Add delivery notes if provided
+            delivery_notes = request.POST.get('delivery_notes', '')
+            if delivery_notes:
+                order.notes = (order.notes or '') + f"\n\nDelivery Notes: {delivery_notes}"
+            
+            order.save()
+            
+            # Log action
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='PurchaseOrder',
+                target_id=order.id,
+                description=f"Received purchase order {order.order_no}",
+                request=request
+            )
+            
+            messages.success(request, f"Purchase order {order.order_no} has been successfully received!")
+            return redirect('inventory:purchase_order_detail', order_id=order.id)
+            
+        except Exception as e:
+            messages.error(request, f"Error receiving order: {str(e)}")
+            return redirect('inventory:purchase_order_receive', order_id=order.id)
+    
+    # GET request - show the form
+    order_items = order.order_items.select_related('item').all()
+    
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'today': timezone.now().date(),
+    }
+    
+    return render(request, 'inventory/purchase_order_receive.html', context)
 
 
 @login_required
@@ -1975,3 +2312,68 @@ def supplier_login(request):
             messages.error(request, "Invalid username or password.")
     
     return render(request, 'inventory/supplier_login.html')
+
+
+@login_required
+@permission_required('inventory_read')
+def expiration_tracker(request):
+    """View to track ingredient expiration dates"""
+    from datetime import timedelta
+    
+    today = timezone.now().date()
+    
+    # Get all stock lots with expiration dates
+    all_lots_with_expiry = StockLot.objects.filter(
+        qty__gt=0,
+        expires_at__isnull=False
+    ).select_related('item').order_by('expires_at')
+    
+    # Expired lots
+    expired_lots = []
+    for lot in all_lots_with_expiry:
+        if lot.expires_at < today:
+            lot.is_expired = True
+            lot.days_overdue = (today - lot.expires_at).days
+            expired_lots.append(lot)
+    
+    # Expiring soon (within 7 days)
+    expiring_soon_date = today + timedelta(days=7)
+    expiring_soon_lots = []
+    for lot in all_lots_with_expiry:
+        if today <= lot.expires_at <= expiring_soon_date:
+            lot.is_expiring_soon = True
+            lot.days_left = (lot.expires_at - today).days
+            expiring_soon_lots.append(lot)
+    
+    # All lots (including those without expiry)
+    all_lots = StockLot.objects.filter(qty__gt=0).select_related('item').order_by('-received_at')
+    
+    # Add status flags to all lots
+    for lot in all_lots:
+        if lot.expires_at:
+            if lot.expires_at < today:
+                lot.is_expired = True
+                lot.is_expiring_soon = False
+            elif lot.expires_at <= expiring_soon_date:
+                lot.is_expired = False
+                lot.is_expiring_soon = True
+            else:
+                lot.is_expired = False
+                lot.is_expiring_soon = False
+        else:
+            lot.is_expired = False
+            lot.is_expiring_soon = False
+    
+    # Fresh stock count
+    fresh_count = all_lots.count() - len(expired_lots) - len(expiring_soon_lots)
+    
+    context = {
+        'expired_lots': expired_lots,
+        'expiring_soon_lots': expiring_soon_lots,
+        'all_lots': all_lots,
+        'expired_count': len(expired_lots),
+        'expiring_soon_count': len(expiring_soon_lots),
+        'fresh_count': fresh_count,
+    }
+    
+    return render(request, 'inventory/expiration_tracker.html', context)

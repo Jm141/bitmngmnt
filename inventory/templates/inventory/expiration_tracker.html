@@ -1,0 +1,309 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Expiration Tracker{% endblock %}
+{% block page_title %}Expiration Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div class="space-y-1">
+            <h1 class="font-serif text-3xl md:text-4xl tracking-tight">
+                Expiration Tracker
+            </h1>
+            <p class="text-muted-foreground">Monitor ingredient expiration dates and prevent waste</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card bg-red-50 border-red-200">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-red-600">Expired</p>
+                        <p class="text-3xl font-bold text-red-700">{{ expired_count }}</p>
+                        <p class="text-xs text-red-600 mt-1">Items past expiration</p>
+                    </div>
+                    <div class="h-12 w-12 rounded-full bg-red-200 flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-red-700 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-yellow-50 border-yellow-200">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-yellow-600">Expiring Soon</p>
+                        <p class="text-3xl font-bold text-yellow-700">{{ expiring_soon_count }}</p>
+                        <p class="text-xs text-yellow-600 mt-1">Within 7 days</p>
+                    </div>
+                    <div class="h-12 w-12 rounded-full bg-yellow-200 flex items-center justify-center">
+                        <i class="fas fa-clock text-yellow-700 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-green-50 border-green-200">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-green-600">Fresh Stock</p>
+                        <p class="text-3xl font-bold text-green-700">{{ fresh_count }}</p>
+                        <p class="text-xs text-green-600 mt-1">Good condition</p>
+                    </div>
+                    <div class="h-12 w-12 rounded-full bg-green-200 flex items-center justify-center">
+                        <i class="fas fa-check-circle text-green-700 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+        <div class="card-header border-b">
+            <div class="flex gap-4">
+                <button class="tab-btn active" data-tab="expired">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Expired
+                </button>
+                <button class="tab-btn" data-tab="expiring">
+                    <i class="fas fa-clock mr-2"></i>Expiring Soon
+                </button>
+                <button class="tab-btn" data-tab="all">
+                    <i class="fas fa-list mr-2"></i>All Items
+                </button>
+            </div>
+        </div>
+
+        <!-- Expired Items Tab -->
+        <div class="tab-content active" id="expired-tab">
+            <div class="card-body">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item Code</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item Name</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Lot Number</th>
+                                <th class="text-right py-3 text-sm font-medium text-muted-foreground">Quantity</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Expired Date</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Days Overdue</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lot in expired_lots %}
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="py-3 text-sm font-medium">{{ lot.item.code }}</td>
+                                <td class="py-3 text-sm">{{ lot.item.name }}</td>
+                                <td class="py-3 text-sm">{{ lot.lot_no }}</td>
+                                <td class="py-3 text-sm text-right">{{ lot.qty }} {{ lot.unit }}</td>
+                                <td class="py-3 text-sm text-red-600">{{ lot.expires_at|date:"M d, Y" }}</td>
+                                <td class="py-3 text-sm text-red-600 font-medium">{{ lot.days_overdue }} days</td>
+                                <td class="py-3">
+                                    <button class="btn btn-sm btn-danger" onclick="markAsSpoiled('{{ lot.id }}')">
+                                        <i class="fas fa-trash mr-1"></i>Mark as Spoiled
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="py-8 text-center text-muted-foreground">
+                                    <i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i>
+                                    <p>No expired items</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expiring Soon Tab -->
+        <div class="tab-content" id="expiring-tab">
+            <div class="card-body">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item Code</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item Name</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Lot Number</th>
+                                <th class="text-right py-3 text-sm font-medium text-muted-foreground">Quantity</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Expiry Date</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Days Left</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lot in expiring_soon_lots %}
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="py-3 text-sm font-medium">{{ lot.item.code }}</td>
+                                <td class="py-3 text-sm">{{ lot.item.name }}</td>
+                                <td class="py-3 text-sm">{{ lot.lot_no }}</td>
+                                <td class="py-3 text-sm text-right">{{ lot.qty }} {{ lot.unit }}</td>
+                                <td class="py-3 text-sm text-yellow-600">{{ lot.expires_at|date:"M d, Y" }}</td>
+                                <td class="py-3 text-sm text-yellow-600 font-medium">{{ lot.days_left }} days</td>
+                                <td class="py-3">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <i class="fas fa-exclamation-circle mr-1"></i>Use Soon
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="py-8 text-center text-muted-foreground">
+                                    <i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i>
+                                    <p>No items expiring soon</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Items Tab -->
+        <div class="tab-content" id="all-tab">
+            <div class="card-body">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item Code</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item Name</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Lot Number</th>
+                                <th class="text-right py-3 text-sm font-medium text-muted-foreground">Quantity</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Received</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Expiry Date</th>
+                                <th class="text-left py-3 text-sm font-medium text-muted-foreground">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lot in all_lots %}
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="py-3 text-sm font-medium">{{ lot.item.code }}</td>
+                                <td class="py-3 text-sm">{{ lot.item.name }}</td>
+                                <td class="py-3 text-sm">{{ lot.lot_no }}</td>
+                                <td class="py-3 text-sm text-right">{{ lot.qty }} {{ lot.unit }}</td>
+                                <td class="py-3 text-sm">{{ lot.received_at|date:"M d, Y" }}</td>
+                                <td class="py-3 text-sm">
+                                    {% if lot.expires_at %}
+                                        {{ lot.expires_at|date:"M d, Y" }}
+                                    {% else %}
+                                        <span class="text-muted-foreground">No expiry</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3">
+                                    {% if lot.is_expired %}
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <i class="fas fa-times-circle mr-1"></i>Expired
+                                        </span>
+                                    {% elif lot.is_expiring_soon %}
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>Expiring Soon
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-check-circle mr-1"></i>Fresh
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="py-8 text-center text-muted-foreground">
+                                    <i class="fas fa-box-open text-4xl text-gray-300 mb-2"></i>
+                                    <p>No stock lots found</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    color: #6b7280;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    cursor: pointer;
+}
+
+.tab-btn:hover {
+    color: #3c2f2f;
+}
+
+.tab-btn.active {
+    color: #c9a27b;
+    border-bottom-color: #c9a27b;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+</style>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        // Remove active class from all tabs and contents
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked tab
+        this.classList.add('active');
+        
+        // Show corresponding content
+        const tabName = this.getAttribute('data-tab');
+        document.getElementById(tabName + '-tab').classList.add('active');
+    });
+});
+
+// Mark as spoiled function
+function markAsSpoiled(lotId) {
+    if (confirm('Mark this lot as spoiled? This will remove it from inventory.')) {
+        fetch(`/stock/spoilage/${lotId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Lot marked as spoiled successfully');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to mark as spoiled'));
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
+    }
+}
+</script>
+{% endblock %}

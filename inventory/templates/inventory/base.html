@@ -1,3 +1,4 @@
+{% load permission_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1084,65 +1085,117 @@
                         Logout
                     </a>
                 {% else %}
-                    {# STAFF/ADMIN NAVIGATION - Full features #}
-                    <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'inventory:dashboard' %}">
-                        <i class="fas fa-house nav-icon"></i>
-                        Dashboard
-                    </a>
-                    <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/" onclick="console.log('Inventory link clicked:', this.href);">
-                        <i class="fas fa-box nav-icon"></i>
-                        Inventory
-                    </a>
-                    <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' or request.resolver_match.url_name == 'item_create' or request.resolver_match.url_name == 'item_update' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
-                        <i class="fas fa-bag-shopping nav-icon"></i>
-                        Items
-                    </a>
-                    <!-- <a class="nav-item {% if request.resolver_match.url_name == 'stock_receive' or request.resolver_match.url_name == 'stock_consume' or request.resolver_match.url_name == 'production_create' %}active{% endif %}" href="{% url 'inventory:stock_receive' %}">
-                        <i class="fas fa-exchange-alt nav-icon"></i>
-                        Stock Operations
-                    </a> -->
-                    <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
-                        <i class="fas fa-shopping-cart nav-icon"></i>
-                        Purchase Orders
-                    </a>
-                    <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
-                        <i class="fas fa-truck nav-icon"></i>
-                        Suppliers
-                    </a>
-                    <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' or request.resolver_match.url_name == 'recipe_create' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
-                        <i class="fas fa-book nav-icon"></i>
-                        Recipes
-                    </a>
-                    <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
-                        <i class="fas fa-chart-bar nav-icon"></i>
-                        Reports
-                    </a>
+                    {# NAVIGATION BASED ON USER ROLE #}
+                    
                     {% if user.role == 'staff' %}
-                    <a class="nav-item {% if request.resolver_match.url_name == 'attendance_dashboard' %}active{% endif %}" href="{% url 'inventory:attendance_dashboard' %}">
-                        <i class="fas fa-clock nav-icon"></i>
-                        Attendance
-                    </a>
+                        {# STAFF NAVIGATION - Based on permissions #}
+                        <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'inventory:dashboard' %}">
+                            <i class="fas fa-house nav-icon"></i>
+                            Dashboard
+                        </a>
+                        
+                        {% if user|has_perm:'inventory_read' %}
+                        <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/">
+                            <i class="fas fa-box nav-icon"></i>
+                            Inventory
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
+                            <i class="fas fa-bag-shopping nav-icon"></i>
+                            Items
+                        </a>
+                        {% endif %}
+                        
+                        {% if user|has_perm:'inventory_write' %}
+                        <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
+                            <i class="fas fa-shopping-cart nav-icon"></i>
+                            Purchase Orders
+                        </a>
+                        {% endif %}
+                        
+                        {% if user|has_perm:'inventory_read' %}
+                        <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
+                            <i class="fas fa-truck nav-icon"></i>
+                            Suppliers
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
+                            <i class="fas fa-book nav-icon"></i>
+                            Recipes
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
+                            <i class="fas fa-calendar-times nav-icon"></i>
+                            Expiration Tracker
+                        </a>
+                        {% endif %}
+                        
+                        {% if user|has_perm:'reports_read' %}
+                        <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
+                            <i class="fas fa-chart-bar nav-icon"></i>
+                            Reports
+                        </a>
+                        {% endif %}
+                        
+                        <a class="nav-item {% if request.resolver_match.url_name == 'attendance_dashboard' %}active{% endif %}" href="{% url 'inventory:attendance_dashboard' %}">
+                            <i class="fas fa-clock nav-icon"></i>
+                            My Attendance
+                        </a>
+                    
+                    {% else %}
+                        {# ADMIN/SUPER_ADMIN NAVIGATION - Full features #}
+                        <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'inventory:dashboard' %}">
+                            <i class="fas fa-house nav-icon"></i>
+                            Dashboard
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/" onclick="console.log('Inventory link clicked:', this.href);">
+                            <i class="fas fa-box nav-icon"></i>
+                            Inventory
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' or request.resolver_match.url_name == 'item_create' or request.resolver_match.url_name == 'item_update' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
+                            <i class="fas fa-bag-shopping nav-icon"></i>
+                            Items
+                        </a>
+                        <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
+                            <i class="fas fa-shopping-cart nav-icon"></i>
+                            Purchase Orders
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
+                            <i class="fas fa-truck nav-icon"></i>
+                            Suppliers
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' or request.resolver_match.url_name == 'recipe_create' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
+                            <i class="fas fa-book nav-icon"></i>
+                            Recipes
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
+                            <i class="fas fa-calendar-times nav-icon"></i>
+                            Expiration Tracker
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
+                            <i class="fas fa-chart-bar nav-icon"></i>
+                            Reports
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'inventory:user_list' %}">
+                            <i class="fas fa-users nav-icon"></i>
+                            Team
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'admin_attendance_overview' %}active{% endif %}" href="{% url 'inventory:admin_attendance_overview' %}">
+                            <i class="fas fa-calendar-check nav-icon"></i>
+                            Attendance Overview
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
+                            <i class="fas fa-history nav-icon"></i>
+                            Activity Logs
+                        </a>
+                        {% if user.role == 'super_admin' %}
+                        <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
+                            <i class="fas fa-clipboard-list nav-icon"></i>
+                            Audit Logs
+                        </a>
+                        {% endif %}
+                        <a class="nav-item" href="#">
+                            <i class="fas fa-gear nav-icon"></i>
+                            Settings
+                        </a>
                     {% endif %}
-                    {% if user.role == 'admin' or user.role == 'super_admin' %}
-                    <a class="nav-item {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'inventory:user_list' %}">
-                        <i class="fas fa-users nav-icon"></i>
-                        Team
-                    </a>
-                    <a class="nav-item {% if request.resolver_match.url_name == 'admin_attendance_overview' %}active{% endif %}" href="{% url 'inventory:admin_attendance_overview' %}">
-                        <i class="fas fa-calendar-check nav-icon"></i>
-                        Attendance
-                    </a>
-                    {% endif %}
-                    {% if user.role == 'super_admin' %}
-                    <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
-                        <i class="fas fa-clipboard-list nav-icon"></i>
-                        Audit Logs
-                    </a>
-                    {% endif %}
-                    <a class="nav-item" href="#">
-                        <i class="fas fa-gear nav-icon"></i>
-                        Settings
-                    </a>
                 {% endif %}
             </nav>
 

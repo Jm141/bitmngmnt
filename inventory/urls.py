@@ -61,12 +61,16 @@ urlpatterns = [
     # Reports
     path('reports/stock/', views.stock_report, name='stock_report'),
     
+    # Expiration Tracker
+    path('expiration-tracker/', views.expiration_tracker, name='expiration_tracker'),
+    
     # Purchase Orders
     path('purchase-orders/', views.purchase_order_list, name='purchase_order_list'),
     path('purchase-orders/create/', views.purchase_order_create, name='purchase_order_create'),
     path('purchase-orders/<uuid:order_id>/', views.purchase_order_detail, name='purchase_order_detail'),
     path('purchase-orders/<uuid:order_id>/approve/', views.purchase_order_approve, name='purchase_order_approve'),
     path('purchase-orders/<uuid:order_id>/ship/', views.purchase_order_ship, name='purchase_order_ship'),
+    path('purchase-orders/<uuid:order_id>/receive/', views.purchase_order_receive, name='purchase_order_receive'),
     path('purchase-orders/<uuid:order_id>/cancel/', views.purchase_order_cancel, name='purchase_order_cancel'),
     path('purchase-orders/scan/receive/', views.purchase_order_scan_receive, name='purchase_order_scan_receive'),
     

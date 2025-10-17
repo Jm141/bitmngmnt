@@ -125,6 +125,97 @@
                             {% endif %}
                         </div>
 
+                        <hr class="my-4">
+
+                        <!-- User Account Creation Section -->
+                        <div class="form-group mb-4">
+                            <div class="form-check">
+                                {{ form.create_user_account }}
+                                <label class="form-check-label" for="{{ form.create_user_account.id_for_label }}">
+                                    <strong>{{ form.create_user_account.label }}</strong>
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">{{ form.create_user_account.help_text }}</small>
+                        </div>
+
+                        <div id="userAccountFields" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> <strong>Supplier Portal Access</strong><br>
+                                Creating a user account allows this supplier to login to the supplier portal where they can view and manage their purchase orders.
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-4">
+                                        <label for="{{ form.user_first_name.id_for_label }}" class="form-label">
+                                            {{ form.user_first_name.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.user_first_name }}
+                                        {% if form.user_first_name.errors %}
+                                            <div class="text-danger mt-1">
+                                                {% for error in form.user_first_name.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-4">
+                                        <label for="{{ form.user_last_name.id_for_label }}" class="form-label">
+                                            {{ form.user_last_name.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.user_last_name }}
+                                        {% if form.user_last_name.errors %}
+                                            <div class="text-danger mt-1">
+                                                {% for error in form.user_last_name.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-4">
+                                        <label for="{{ form.user_password.id_for_label }}" class="form-label">
+                                            {{ form.user_password.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.user_password }}
+                                        <small class="form-text text-muted">{{ form.user_password.help_text }}</small>
+                                        {% if form.user_password.errors %}
+                                            <div class="text-danger mt-1">
+                                                {% for error in form.user_password.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-4">
+                                        <label for="{{ form.user_password_confirm.id_for_label }}" class="form-label">
+                                            {{ form.user_password_confirm.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.user_password_confirm }}
+                                        {% if form.user_password_confirm.errors %}
+                                            <div class="text-danger mt-1">
+                                                {% for error in form.user_password_confirm.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> Username will be auto-generated from first and last name. The supplier will use their email and password to login.
+                            </div>
+                        </div>
+
                         {% if form.non_field_errors %}
                             <div class="alert alert-danger">
                                 {% for error in form.non_field_errors %}
@@ -171,5 +262,29 @@
         </div>
     </div>
 </div>
+
+<script>
+// Toggle user account fields visibility
+document.addEventListener('DOMContentLoaded', function() {
+    const createAccountCheckbox = document.getElementById('{{ form.create_user_account.id_for_label }}');
+    const userAccountFields = document.getElementById('userAccountFields');
+    
+    if (createAccountCheckbox) {
+        // Set initial state
+        if (createAccountCheckbox.checked) {
+            userAccountFields.style.display = 'block';
+        }
+        
+        // Toggle on change
+        createAccountCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                userAccountFields.style.display = 'block';
+            } else {
+                userAccountFields.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
 

@@ -149,44 +149,59 @@ document.getElementById('openCameraBtn').addEventListener('click', function() {
     
     // Show camera div
     scannerDiv.style.display = 'block';
-    
-    // Initialize scanner
-    html5QrcodeScanner = new Html5Qrcode("qrVideo");
-    
     statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-camera me-2"></i>Starting camera... Please allow camera access.</div>';
+    
+    // Initialize scanner with proper configuration
+    html5QrcodeScanner = new Html5Qrcode("qrVideo");
     
     const config = {
         fps: 10,
         qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
+        aspectRatio: 1.0,
+        disableFlip: false
     };
     
-    html5QrcodeScanner.start(
-        { facingMode: "environment" }, // Use back camera on mobile
-        config,
-        (decodedText, decodedResult) => {
-            // QR Code detected!
-            statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>QR Code detected!</div>';
+    // Request camera permissions and start scanning
+    Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+            // Use back camera if available (environment facing)
+            const cameraId = devices.length > 1 ? devices[1].id : devices[0].id;
             
-            // Fill in the QR code input
-            document.getElementById('{{ form.qr_code.id_for_label }}').value = decodedText;
-            
-            // Stop scanner
-            html5QrcodeScanner.stop().then(() => {
-                scannerDiv.style.display = 'none';
-                
-                // Auto-submit form
-                setTimeout(() => {
-                    document.getElementById('qrScanForm').submit();
-                }, 500);
+            html5QrcodeScanner.start(
+                cameraId,
+                config,
+                (decodedText, decodedResult) => {
+                    // QR Code detected!
+                    statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>QR Code detected!</div>';
+                    
+                    // Fill in the QR code input
+                    document.getElementById('{{ form.qr_code.id_for_label }}').value = decodedText;
+                    
+                    // Stop scanner
+                    html5QrcodeScanner.stop().then(() => {
+                        scannerDiv.style.display = 'none';
+                        
+                        // Auto-submit form
+                        setTimeout(() => {
+                            document.getElementById('qrScanForm').submit();
+                        }, 500);
+                    }).catch(err => {
+                        console.error('Error stopping scanner:', err);
+                    });
+                },
+                (errorMessage) => {
+                    // Scanning error (ignore, this fires continuously when no QR detected)
+                }
+            ).catch(err => {
+                statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Error starting camera: ' + err + '</div>';
+                console.error('Camera start error:', err);
             });
-        },
-        (errorMessage) => {
-            // Scanning error (ignore, this fires continuously when no QR detected)
+        } else {
+            statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>No cameras found on this device.</div>';
         }
-    ).catch(err => {
-        statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Error accessing camera. Please check permissions.</div>';
-        console.error('Camera error:', err);
+    }).catch(err => {
+        statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Error accessing camera. Please check permissions and ensure you are using HTTPS.</div>';
+        console.error('Camera permission error:', err);
     });
 });
 
@@ -198,6 +213,8 @@ document.getElementById('closeCameraBtn').addEventListener('click', function() {
             console.error('Error stopping scanner:', err);
             document.getElementById('cameraScanner').style.display = 'none';
         });
+    } else {
+        document.getElementById('cameraScanner').style.display = 'none';
     }
 });
 </script>

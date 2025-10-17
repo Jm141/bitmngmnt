@@ -46,11 +46,11 @@ def role_required(allowed_roles):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             if not request.user.is_authenticated:
-                return redirect('login')
+                return redirect('inventory:login')
             
             if request.user.role not in allowed_roles:
                 messages.error(request, "You don't have permission to access this page.")
-                return redirect('dashboard')
+                return redirect('inventory:dashboard')
             
             return view_func(request, *args, **kwargs)
         return wrapper
@@ -65,7 +65,7 @@ def permission_required(permission_type):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             if not request.user.is_authenticated:
-                return redirect('login')
+                return redirect('inventory:login')
             
             # Super admin and admin have all permissions
             if request.user.role in ['super_admin', 'admin']:
@@ -80,7 +80,7 @@ def permission_required(permission_type):
             
             if not has_permission:
                 messages.error(request, f"You don't have permission to perform this action.")
-                return redirect('dashboard')
+                return redirect('inventory:dashboard')
             
             return view_func(request, *args, **kwargs)
         return wrapper
@@ -89,16 +89,16 @@ def permission_required(permission_type):
 
 def super_admin_required(view_func):
     """
-    Decorator to require super admin role
+    Decorator to require super admin access
     """
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('login')
+            return redirect('inventory:login')
         
         if request.user.role != 'super_admin':
             messages.error(request, "Only Super Admin can access this page.")
-            return redirect('dashboard')
+            return redirect('inventory:dashboard')
         
         return view_func(request, *args, **kwargs)
     return wrapper
@@ -111,11 +111,11 @@ def admin_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('login')
+            return redirect('inventory:login')
         
         if request.user.role not in ['admin', 'super_admin']:
             messages.error(request, "Only Admin or Super Admin can access this page.")
-            return redirect('dashboard')
+            return redirect('inventory:dashboard')
         
         return view_func(request, *args, **kwargs)
     return wrapper
