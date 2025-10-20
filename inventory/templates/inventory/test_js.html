@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Test</title>
+</head>
+<body>
+    <h1>JavaScript Test Page</h1>
+    
+    <form id="testForm">
+        <input type="text" name="test_field" value="test">
+        <input type="hidden" name="ingredients_data" id="id_ingredients_data" value="">
+        <button type="submit">Submit</button>
+    </form>
+    
+    <div id="output"></div>
+    
+    <script>
+        console.log('Script loaded');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+            
+            const form = document.getElementById('testForm');
+            const hiddenInput = document.getElementById('id_ingredients_data');
+            const output = document.getElementById('output');
+            
+            console.log('Form:', form);
+            console.log('Hidden input:', hiddenInput);
+            
+            output.innerHTML = '<p>Form found: ' + (!!form) + '</p>';
+            output.innerHTML += '<p>Hidden input found: ' + (!!hiddenInput) + '</p>';
+            
+            if (form && hiddenInput) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    console.log('Form submitting');
+                    
+                    const testData = {test: 'value', number: 123};
+                    const jsonData = JSON.stringify(testData);
+                    
+                    console.log('Setting hidden field to:', jsonData);
+                    hiddenInput.value = jsonData;
+                    
+                    console.log('Hidden field value is now:', hiddenInput.value);
+                    
+                    output.innerHTML += '<p style="color: green;">Hidden field set successfully!</p>';
+                    output.innerHTML += '<p>Value: ' + hiddenInput.value + '</p>';
+                    
+                    // Uncomment to actually submit:
+                    // form.submit();
+                });
+            } else {
+                output.innerHTML += '<p style="color: red;">ERROR: Elements not found!</p>';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -143,13 +143,25 @@ document.getElementById('{{ form.qr_code.id_for_label }}').addEventListener('key
 // Camera QR Code Scanner
 let html5QrcodeScanner = null;
 
-document.getElementById('openCameraBtn').addEventListener('click', function() {
+document.getElementById('openCameraBtn').addEventListener('click', async function() {
+    // Stop any existing scanner first
+    if (html5QrcodeScanner) {
+        try {
+            await html5QrcodeScanner.stop();
+        } catch (err) {
+            console.log('No active scanner to stop');
+        }
+    }
+    
     const scannerDiv = document.getElementById('cameraScanner');
     const statusDiv = document.getElementById('scanStatus');
     
     // Show camera div
     scannerDiv.style.display = 'block';
     statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-camera me-2"></i>Starting camera... Please allow camera access.</div>';
+    
+    // Wait a bit before initializing new scanner
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     // Initialize scanner with proper configuration
     html5QrcodeScanner = new Html5Qrcode("qrVideo");
@@ -158,7 +170,10 @@ document.getElementById('openCameraBtn').addEventListener('click', function() {
         fps: 10,
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
-        disableFlip: false
+        disableFlip: false,
+        videoConstraints: {
+            facingMode: "environment"
+        }
     };
     
     // Request camera permissions and start scanning

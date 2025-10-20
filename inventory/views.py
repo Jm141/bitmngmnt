@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
@@ -24,6 +24,51 @@ import json
 from django.http import HttpResponseBadRequest
 from django.core.serializers.json import DjangoJSONEncoder
 from decimal import Decimal
+
+
+def unified_login(request):
+    """
+    Unified login view for all user types - redirects based on role
+    """
+    if request.user.is_authenticated:
+        # Redirect authenticated users based on their role
+        if request.user.is_supplier_user():
+            return redirect('inventory:supplier_dashboard')
+        elif request.user.role == 'staff':
+            return redirect('inventory:attendance_dashboard')
+        else:
+            return redirect('inventory:dashboard')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            login(request, user)
+            log_user_action(
+                user=user,
+                action_type='login',
+                target_model='User',
+                description=f"User logged in",
+                request=request
+            )
+            
+            # Redirect based on user role
+            if user.is_supplier_user():
+                messages.success(request, f"Welcome back, {user.supplier.name}!")
+                return redirect('inventory:supplier_dashboard')
+            elif user.role == 'staff':
+                messages.success(request, f"Welcome back, {user.get_full_name()}!")
+                return redirect('inventory:attendance_dashboard')
+            else:
+                messages.success(request, f"Welcome back, {user.get_full_name()}!")
+                return redirect('inventory:dashboard')
+        else:
+            messages.error(request, "Invalid username or password.")
+    
+    return render(request, 'inventory/login.html')
 
 
 @login_required
@@ -58,8 +103,33 @@ def dashboard(request):
     # Calculate low stock items (items below reorder level)
     low_stock_count = 0
     out_of_stock_count = 0
+    finished_goods_count = 0
+    finished_goods_low_stock = 0
+    finished_goods_value = 0
+    
     for item in Item.objects.filter(is_active=True):
         current_stock = item.get_current_stock()
+        
+        # Count finished goods
+        if item.category == 'finished_good':
+            finished_goods_count += 1
+            # Calculate finished goods value
+            fg_value = StockLot.objects.filter(
+                item=item,
+                qty__gt=0
+            ).aggregate(
+                total=Sum(ExpressionWrapper(
+                    F('qty') * F('unit_cost'),
+                    output_field=DecimalField()
+                ))
+            )['total'] or 0
+            finished_goods_value += float(fg_value)
+            
+            # Check if finished good is low stock
+            if current_stock <= item.reorder_level and current_stock > 0:
+                finished_goods_low_stock += 1
+        
+        # Count all low stock
         if current_stock == 0:
             out_of_stock_count += 1
         elif current_stock <= item.reorder_level:
@@ -149,6 +219,9 @@ def dashboard(request):
         'total_value': total_value,
         'low_stock_count': low_stock_count,
         'out_of_stock_count': out_of_stock_count,
+        'finished_goods_count': finished_goods_count,
+        'finished_goods_low_stock': finished_goods_low_stock,
+        'finished_goods_value': finished_goods_value,
         'recent_items_data': recent_items_data,
         'monthly_values': json.dumps(monthly_values),
         'monthly_labels': json.dumps(monthly_labels),
@@ -1264,6 +1337,13 @@ def production_create(request):
             try:
                 recipe = form.cleaned_data['recipe']
                 production_qty = form.cleaned_data['production_qty']
+                unit_cost = form.cleaned_data.get('unit_cost')
+                
+                # Auto-calculate unit cost if not provided
+                if not unit_cost:
+                    total_cost = RecipeService.calculate_recipe_cost(recipe)
+                    unit_cost = total_cost / recipe.yield_qty if recipe.yield_qty > 0 else 0
+                    messages.info(request, f"Unit cost auto-calculated: ₱{unit_cost:.2f} per {recipe.get_yield_unit_display()}")
                 
                 # Validate production
                 validation = RecipeService.validate_recipe_production(recipe, production_qty)
@@ -1281,7 +1361,8 @@ def production_create(request):
                     lot_no=form.cleaned_data['lot_no'],
                     user=request.user,
                     expires_at=form.cleaned_data.get('expires_at'),
-                    notes=form.cleaned_data.get('notes')
+                    notes=form.cleaned_data.get('notes'),
+                    unit_cost=unit_cost
                 )
                 
                 log_user_action(
@@ -1465,14 +1546,53 @@ def recipe_detail(request, recipe_id):
 @permission_required('inventory_write')
 def recipe_create(request):
     """
-    Create new recipe
+    Create new recipe with ingredients and steps
     """
     if request.method == 'POST':
+        # Debug: Print all POST data
+        print("=" * 50)
+        print("POST DATA RECEIVED:")
+        for key, value in request.POST.items():
+            print(f"  {key}: {value[:100] if len(str(value)) > 100 else value}")
+        print("=" * 50)
+        
         form = RecipeForm(request.POST)
         if form.is_valid():
             recipe = form.save(commit=False)
             recipe.created_by = request.user
             recipe.save()
+            
+            # Process ingredients data from JSON
+            ingredients_data = request.POST.get('ingredients_data', '')
+            ingredients_added = 0
+            
+            print(f"Ingredients data received: '{ingredients_data}'")
+            
+            if ingredients_data:
+                try:
+                    import json
+                    ingredients = json.loads(ingredients_data)
+                    for ing_data in ingredients:
+                        ingredient_id = ing_data.get('ingredient_id')
+                        qty = ing_data.get('qty')
+                        unit = ing_data.get('unit')
+                        
+                        if ingredient_id and qty:
+                            RecipeItem.objects.create(
+                                recipe=recipe,
+                                ingredient_id=ingredient_id,
+                                qty=qty,
+                                unit=unit,
+                                loss_factor=0
+                            )
+                            ingredients_added += 1
+                except (json.JSONDecodeError, Exception) as e:
+                    messages.warning(request, f"Error adding ingredients: {str(e)}")
+            else:
+                messages.warning(request, "No ingredients data received. Please make sure to add at least one ingredient.")
+            
+            if ingredients_added > 0:
+                messages.info(request, f"Added {ingredients_added} ingredient(s) to the recipe.")
             
             log_user_action(
                 user=request.user,
@@ -1483,14 +1603,18 @@ def recipe_create(request):
                 request=request
             )
             
-            messages.success(request, f"Recipe {recipe.name} created successfully.")
+            messages.success(request, f"Recipe '{recipe.name}' created successfully!")
             return redirect('inventory:recipe_detail', recipe_id=recipe.id)
     else:
         form = RecipeForm()
     
+    # Get all active ingredients for the ingredient selector
+    ingredients = Item.objects.filter(category='ingredient', is_active=True).order_by('name')
+    
     context = {
         'form': form,
         'title': 'Create Recipe',
+        'ingredients': ingredients,
     }
     
     return render(request, 'inventory/recipe_form.html', context)
@@ -1501,9 +1625,12 @@ def recipe_create(request):
 def stock_report(request):
     """
     Comprehensive stock report with date range, consumption tracking, and analytics
+    Supports CSV export
     """
+    import csv
     from datetime import datetime, timedelta
     from django.db.models import Sum, Count, Q
+    from django.http import HttpResponse
     from decimal import Decimal
     
     # Get filters
@@ -1616,6 +1743,70 @@ def stock_report(request):
         'total_received': total_received,
         'total_produced': total_produced,
     }
+    
+    # Check if CSV export is requested
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="stock_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+        
+        writer = csv.writer(response)
+        
+        # Write header
+        writer.writerow([
+            'Item Code',
+            'Item Name',
+            'Category',
+            'Current Stock',
+            'Unit',
+            'Reorder Level',
+            'Status',
+            'Unit Cost',
+            'Total Value',
+            'Consumed',
+            'Received',
+            'Produced',
+            'Adjusted',
+            'Expiring Soon'
+        ])
+        
+        # Write data rows
+        for data in report_data:
+            status = 'Low Stock' if data['is_low_stock'] else 'OK'
+            writer.writerow([
+                data['item'].code,
+                data['item'].name,
+                data['item'].get_category_display(),
+                f"{data['current_stock']:.2f}",
+                data['item'].get_unit_display(),
+                f"{data['reorder_level']:.2f}",
+                status,
+                f"{data['unit_cost']:.2f}",
+                f"{data['item_value']:.2f}",
+                f"{data['consumed']:.2f}",
+                f"{data['received']:.2f}",
+                f"{data['produced']:.2f}",
+                f"{data['adjusted']:.2f}",
+                data['expiring_soon']
+            ])
+        
+        # Write summary row
+        writer.writerow([])
+        writer.writerow(['SUMMARY'])
+        writer.writerow(['Total Items', summary['total_items']])
+        writer.writerow(['Low Stock Items', summary['low_stock_count']])
+        writer.writerow(['Items with Expiring Stock', summary['expiring_count']])
+        writer.writerow(['Total Inventory Value', f"₱{summary['total_value']:.2f}"])
+        writer.writerow(['Total Consumed', f"{summary['total_consumed']:.2f}"])
+        writer.writerow(['Total Received', f"{summary['total_received']:.2f}"])
+        writer.writerow(['Total Produced', f"{summary['total_produced']:.2f}"])
+        
+        if date_from or date_to:
+            writer.writerow([])
+            writer.writerow(['Report Period'])
+            writer.writerow(['From', date_from or 'Beginning'])
+            writer.writerow(['To', date_to or 'Today'])
+        
+        return response
     
     context = {
         'report_data': report_data,

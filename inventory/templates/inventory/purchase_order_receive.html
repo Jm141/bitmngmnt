@@ -53,8 +53,7 @@
                             <tr class="border-b">
                                 <th class="text-left py-3 text-sm font-medium text-muted-foreground">Item</th>
                                 <th class="text-left py-3 text-sm font-medium text-muted-foreground">Category</th>
-                                <th class="text-right py-3 text-sm font-medium text-muted-foreground">Qty Ordered</th>
-                                <th class="text-right py-3 text-sm font-medium text-muted-foreground">Qty to Receive</th>
+                                <th class="text-right py-3 text-sm font-medium text-muted-foreground">Quantity</th>
                                 <th class="text-left py-3 text-sm font-medium text-muted-foreground">Lot Number</th>
                                 <th class="text-left py-3 text-sm font-medium text-muted-foreground">Expiration Date</th>
                                 <th class="text-left py-3 text-sm font-medium text-muted-foreground">Notes</th>
@@ -80,19 +79,9 @@
                                     </span>
                                 </td>
                                 <td class="py-3 text-right">
-                                    <span class="font-medium">{{ item.qty_ordered }} {{ item.get_unit_display }}</span>
-                                </td>
-                                <td class="py-3 text-right">
-                                    <input 
-                                        type="number" 
-                                        name="qty_received_{{ item.id }}" 
-                                        value="{{ item.qty_ordered }}" 
-                                        step="0.01"
-                                        min="0"
-                                        max="{{ item.qty_ordered }}"
-                                        class="form-input w-24 text-right"
-                                        required
-                                    >
+                                    <span class="font-medium text-lg">{{ item.qty_ordered }} {{ item.get_unit_display }}</span>
+                                    <!-- Hidden input to send quantity -->
+                                    <input type="hidden" name="qty_received_{{ item.id }}" value="{{ item.qty_ordered }}">
                                 </td>
                                 <td class="py-3">
                                     <input 
@@ -261,17 +250,15 @@ function previewReceiving() {
     previewHTML += '<table class="w-full text-sm"><thead><tr class="border-b"><th class="text-left py-2">Item</th><th class="text-right py-2">Qty</th><th class="text-left py-2">Lot</th><th class="text-left py-2">Expires</th></tr></thead><tbody>';
     
     {% for item in order_items %}
-    const qty_{{ item.id }} = formData.get('qty_received_{{ item.id }}');
-    const lot_{{ item.id }} = formData.get('lot_no_{{ item.id }}');
-    const expires_{{ item.id }} = formData.get('expires_at_{{ item.id }}');
-    const notes_{{ item.id }} = formData.get('notes_{{ item.id }}');
+    const lot{{ item.id }} = formData.get('lot_no_{{ item.id }}');
+    const expires{{ item.id }} = formData.get('expires_at_{{ item.id }}');
     
-    previewHTML += `<tr class="border-b">
-        <td class="py-2">{{ item.item.name }}</td>
-        <td class="text-right py-2">${qty_{{ item.id }}} {{ item.get_unit_display }}</td>
-        <td class="py-2">${lot_{{ item.id }}}</td>
-        <td class="py-2">${expires_{{ item.id }} || '<span class="text-gray-400">No expiry</span>'}</td>
-    </tr>`;
+    previewHTML += '<tr class="border-b">';
+    previewHTML += '<td class="py-2">{{ item.item.name }}</td>';
+    previewHTML += '<td class="text-right py-2">{{ item.qty_ordered }} {{ item.get_unit_display }}</td>';
+    previewHTML += '<td class="py-2">' + lot{{ item.id }} + '</td>';
+    previewHTML += '<td class="py-2">' + (expires{{ item.id }} || '<span class="text-gray-400">No expiry</span>') + '</td>';
+    previewHTML += '</tr>';
     {% endfor %}
     
     previewHTML += '</tbody></table>';

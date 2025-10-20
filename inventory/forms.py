@@ -577,17 +577,25 @@ class StockMovementForm(forms.ModelForm):
 
 class RecipeForm(forms.ModelForm):
     """
-    Form for managing recipes
+    Form for managing recipes with ingredients and steps
     """
+    # Dynamic ingredient fields (will be handled via JavaScript in template)
+    ingredients_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+        help_text="JSON data for ingredients"
+    )
+    
     class Meta:
         model = Recipe
-        fields = ['name', 'product', 'yield_qty', 'yield_unit', 'description', 'is_active']
+        fields = ['name', 'product', 'yield_qty', 'yield_unit', 'description', 'steps', 'is_active']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Croissant'}),
             'product': forms.Select(attrs={'class': 'form-control'}),
             'yield_qty': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'yield_unit': forms.Select(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Brief description of the recipe'}),
+            'steps': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Step 1: Mix flour and butter\nStep 2: Add sugar and salt\nStep 3: Knead the dough...'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -595,6 +603,16 @@ class RecipeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Filter products to only show finished goods
         self.fields['product'].queryset = Item.objects.filter(category='finished_good', is_active=True)
+        self.fields['steps'].label = "Preparation Steps"
+        self.fields['steps'].help_text = "Enter each step on a new line"
+        
+        # Limit yield_unit choices to only pieces, pack, box, dozen
+        self.fields['yield_unit'].choices = [
+            ('pcs', 'Pieces'),
+            ('pack', 'Pack'),
+            ('box', 'Box'),
+            ('dozen', 'Dozen'),
+        ]
 
     def clean_yield_qty(self):
         yield_qty = self.cleaned_data.get('yield_qty')
@@ -707,6 +725,8 @@ class StockConsumeForm(forms.Form):
     lot = forms.ModelChoiceField(
         queryset=StockLot.objects.filter(qty__gt=0),
         required=False,
+        empty_label="Auto-select (FEFO/FIFO)",
+        help_text="Select a lot to start consuming from. If insufficient, will automatically overflow to next lots using FEFO/FIFO.",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
     qty = forms.DecimalField(
@@ -741,28 +761,41 @@ class StockConsumeForm(forms.Form):
 
 class ProductionForm(forms.Form):
     """
-    Form for production workflow
+    Form for production workflow with pricing
     """
     recipe = forms.ModelChoiceField(
         queryset=Recipe.objects.filter(is_active=True),
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Recipe"
     )
     production_qty = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        label="Quantity to Produce"
+    )
+    unit_cost = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Auto-calculated from recipe'}),
+        label="Unit Cost (₱)",
+        help_text="Leave blank to auto-calculate from recipe ingredients"
     )
     lot_no = forms.CharField(
         max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., LOT-20251020-001'}),
+        label="Lot Number"
     )
     expires_at = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Expiration Date (Optional)"
     )
     notes = forms.CharField(
         required=False,
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3})
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Production notes...'}),
+        label="Notes (Optional)"
     )
 
     def clean_production_qty(self):
@@ -770,6 +803,12 @@ class ProductionForm(forms.Form):
         if production_qty is not None and production_qty <= 0:
             raise ValidationError("Production quantity must be greater than 0.")
         return production_qty
+    
+    def clean_unit_cost(self):
+        unit_cost = self.cleaned_data.get('unit_cost')
+        if unit_cost is not None and unit_cost < 0:
+            raise ValidationError("Unit cost cannot be negative.")
+        return unit_cost
 
 
 # --- PURCHASE ORDER FORMS ---

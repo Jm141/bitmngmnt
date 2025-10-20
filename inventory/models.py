@@ -567,6 +567,7 @@ class Recipe(models.Model):
     yield_qty = models.DecimalField(max_digits=10, decimal_places=2)
     yield_unit = models.CharField(max_length=10, choices=Item.UNIT_CHOICES)
     description = models.TextField(blank=True, null=True)
+    steps = models.TextField(blank=True, null=True, help_text="Recipe preparation steps")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

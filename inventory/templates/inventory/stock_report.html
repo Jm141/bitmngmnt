@@ -65,6 +65,9 @@
                     <button type="submit" class="btn btn-primary me-2">
                         <i class="fas fa-chart-line"></i> Generate Report
                     </button>
+                    <button type="button" onclick="downloadCSV()" class="btn btn-success me-2">
+                        <i class="fas fa-file-csv"></i> Download CSV
+                    </button>
                     <a href="{% url 'inventory:stock_report' %}" class="btn btn-secondary me-2">
                         <i class="fas fa-redo"></i> Reset
                     </a>
@@ -245,4 +248,27 @@
     }
 }
 </style>
+
+<script>
+function downloadCSV() {
+    // Get current filter values
+    const reportType = document.getElementById('report_type').value;
+    const dateFrom = document.getElementById('date_from').value;
+    const dateTo = document.getElementById('date_to').value;
+    const category = document.getElementById('category').value;
+    const lowStock = document.getElementById('low_stock').value;
+    
+    // Build URL with current filters and export parameter
+    let url = '{% url "inventory:stock_report" %}?export=csv';
+    
+    if (reportType) url += '&report_type=' + reportType;
+    if (dateFrom) url += '&date_from=' + dateFrom;
+    if (dateTo) url += '&date_to=' + dateTo;
+    if (category) url += '&category=' + category;
+    if (lowStock) url += '&low_stock=' + lowStock;
+    
+    // Trigger download
+    window.location.href = url;
+}
+</script>
 {% endblock %}

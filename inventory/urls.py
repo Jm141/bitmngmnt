@@ -6,7 +6,7 @@ app_name = 'inventory'
 
 urlpatterns = [
     # Authentication URLs
-    path('login/', auth_views.LoginView.as_view(template_name='inventory/login.html'), name='login'),
+    path('login/', views.unified_login, name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='inventory:login'), name='logout'),
     
     # Dashboard

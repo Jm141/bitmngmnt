@@ -1,0 +1,373 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-book me-2"></i>{{ title }}</h2>
+            <p class="text-muted">Create a new recipe with ingredients and preparation steps</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:recipe_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Recipes
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recipe Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.name.id_for_label }}" class="form-label">Recipe Name *</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger">{{ form.name.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.product.id_for_label }}" class="form-label">Product/Output Item *</label>
+                                {{ form.product }}
+                                {% if form.product.errors %}
+                                    <div class="text-danger">{{ form.product.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">The final product this recipe produces</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.yield_qty.id_for_label }}" class="form-label">Yield Quantity *</label>
+                                {{ form.yield_qty }}
+                                {% if form.yield_qty.errors %}
+                                    <div class="text-danger">{{ form.yield_qty.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">How much this recipe produces</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.yield_unit.id_for_label }}" class="form-label">Yield Unit *</label>
+                                {{ form.yield_unit }}
+                                {% if form.yield_unit.errors %}
+                                    <div class="text-danger">{{ form.yield_unit.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <hr>
+
+                        <!-- Ingredients Section -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Ingredients * <span class="badge bg-info" id="ingredient-count">0 added</span></label>
+                            <p class="text-muted small">Add all ingredients needed for this recipe</p>
+                            
+                            <div id="ingredients-container" class="mb-3" style="min-height: 100px; border: 2px dashed #dee2e6; border-radius: 8px; padding: 15px;">
+                                <!-- Ingredient rows will be added here -->
+                                <p class="text-muted text-center mb-0" id="no-ingredients-msg">Click "Add Ingredient" button below to start adding ingredients</p>
+                            </div>
+                            
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="add-ingredient-btn">
+                                <i class="fas fa-plus me-1"></i>Add Ingredient
+                            </button>
+                            
+                            <!-- Hidden field to store ingredients JSON -->
+                            <input type="hidden" name="ingredients_data" id="id_ingredients_data" value="">
+                        </div>
+
+                        <hr>
+
+                        <!-- Steps Section -->
+                        <div class="mb-3">
+                            <label for="{{ form.steps.id_for_label }}" class="form-label fw-bold">Preparation Steps *</label>
+                            {{ form.steps }}
+                            {% if form.steps.errors %}
+                                <div class="text-danger">{{ form.steps.errors }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">Enter each step on a new line</small>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                Active Recipe
+                            </label>
+                            {% if form.is_active.errors %}
+                                <div class="text-danger">{{ form.is_active.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'inventory:recipe_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="button" class="btn btn-primary" id="saveRecipeBtn">
+                                <i class="fas fa-save me-2"></i>Save Recipe
+                            </button>
+                            <button type="submit" id="realSubmitBtn" style="display: none;">Submit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Recipe Guidelines</h6>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold">Creating a Recipe</h6>
+                    <ol class="small">
+                        <li>Enter a descriptive recipe name (e.g., "Croissant")</li>
+                        <li>Select the final product this recipe produces</li>
+                        <li>Specify how much the recipe yields</li>
+                        <li>Add a description (optional)</li>
+                        <li>Add all required ingredients with quantities</li>
+                        <li>Write the preparation steps</li>
+                    </ol>
+
+                    <hr>
+
+                    <h6 class="fw-bold">Example</h6>
+                    <p class="small mb-2"><strong>Recipe Name:</strong> Croissant</p>
+                    <p class="small mb-2"><strong>Ingredients:</strong></p>
+                    <ul class="small mb-2">
+                        <li>Flour - 500g</li>
+                        <li>Butter - 250g</li>
+                        <li>Sugar - 50g</li>
+                        <li>Salt - 10g</li>
+                    </ul>
+                    <p class="small mb-0"><strong>Steps:</strong> Mix, knead, fold, bake...</p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="small mb-0">
+                        <li>Use clear, descriptive names for recipes</li>
+                        <li>Ensure yield quantities are accurate</li>
+                        <li>Add all ingredients before saving</li>
+                        <li>Write detailed preparation steps</li>
+                        <li>Future: Auto-calculate ingredient consumption during production</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ingredient Row Template -->
+<template id="ingredient-row-template">
+    <div class="ingredient-row card mb-2">
+        <div class="card-body p-3">
+            <div class="row align-items-center">
+                <div class="col-md-5">
+                    <label class="form-label small mb-1">Ingredient</label>
+                    <select class="form-control form-control-sm ingredient-select" required>
+                        <option value="">Select ingredient...</option>
+                        {% for ingredient in ingredients %}
+                        <option value="{{ ingredient.id }}" data-unit="{{ ingredient.unit }}">{{ ingredient.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Quantity</label>
+                    <input type="number" class="form-control form-control-sm ingredient-qty" step="0.01" min="0.01" placeholder="0.00" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Unit</label>
+                    <select class="form-control form-control-sm ingredient-unit" required>
+                        <option value="g">Gram (g)</option>
+                        <option value="kg">Kilogram (kg)</option>
+                        <option value="mL">Milliliter (mL)</option>
+                        <option value="L">Liter (L)</option>
+                        <option value="pcs">Pieces</option>
+                        <option value="pack">Pack</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small mb-1">&nbsp;</label>
+                    <button type="button" class="btn btn-sm btn-danger remove-ingredient-btn w-100">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ingredientsContainer = document.getElementById('ingredients-container');
+    const addIngredientBtn = document.getElementById('add-ingredient-btn');
+    const ingredientTemplate = document.getElementById('ingredient-row-template');
+    const ingredientsDataInput = document.getElementById('id_ingredients_data');
+    const form = document.querySelector('form');
+    
+    // Debug: Check if elements exist
+    console.log('Elements found:', {
+        container: !!ingredientsContainer,
+        button: !!addIngredientBtn,
+        template: !!ingredientTemplate,
+        hiddenInput: !!ingredientsDataInput,
+        form: !!form
+    });
+    
+    if (!ingredientsDataInput) {
+        console.error('ERROR: Hidden input field #id_ingredients_data not found!');
+        alert('Error: Ingredients data field not found. Please contact support.');
+        return;
+    }
+    
+    // Add first ingredient row on load
+    addIngredientRow();
+    
+    // Add ingredient button click
+    addIngredientBtn.addEventListener('click', function() {
+        addIngredientRow();
+    });
+    
+    // Function to update ingredient count
+    function updateIngredientCount() {
+        const count = ingredientsContainer.querySelectorAll('.ingredient-row').length;
+        const countBadge = document.getElementById('ingredient-count');
+        const noIngredientsMsg = document.getElementById('no-ingredients-msg');
+        
+        if (countBadge) {
+            countBadge.textContent = count + ' added';
+            countBadge.className = count > 0 ? 'badge bg-success' : 'badge bg-info';
+        }
+        
+        if (noIngredientsMsg) {
+            noIngredientsMsg.style.display = count > 0 ? 'none' : 'block';
+        }
+    }
+    
+    // Function to add ingredient row
+    function addIngredientRow() {
+        const clone = ingredientTemplate.content.cloneNode(true);
+        ingredientsContainer.appendChild(clone);
+        
+        // Add remove button event listener
+        const rows = ingredientsContainer.querySelectorAll('.ingredient-row');
+        const lastRow = rows[rows.length - 1];
+        const removeBtn = lastRow.querySelector('.remove-ingredient-btn');
+        
+        removeBtn.addEventListener('click', function() {
+            if (ingredientsContainer.querySelectorAll('.ingredient-row').length > 1) {
+                lastRow.remove();
+                updateIngredientCount();
+            } else {
+                alert('At least one ingredient is required!');
+            }
+        });
+        
+        // Auto-select unit based on ingredient
+        const select = lastRow.querySelector('.ingredient-select');
+        const unitSelect = lastRow.querySelector('.ingredient-unit');
+        
+        select.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const defaultUnit = selectedOption.getAttribute('data-unit');
+            if (defaultUnit) {
+                unitSelect.value = defaultUnit;
+            }
+        });
+        
+        updateIngredientCount();
+    }
+    
+    // Save button click handler
+    const saveBtn = document.getElementById('saveRecipeBtn');
+    const realSubmitBtn = document.getElementById('realSubmitBtn');
+    
+    if (saveBtn && form && ingredientsDataInput) {
+        saveBtn.addEventListener('click', function() {
+            console.log('Save button clicked');
+            
+            const ingredientRows = ingredientsContainer.querySelectorAll('.ingredient-row');
+            const ingredientsData = [];
+            
+            console.log('Found ingredient rows:', ingredientRows.length);
+            
+            let hasError = false;
+            ingredientRows.forEach(function(row) {
+                const ingredientSelect = row.querySelector('.ingredient-select');
+                const qtyInput = row.querySelector('.ingredient-qty');
+                const unitSelect = row.querySelector('.ingredient-unit');
+                
+                console.log('Row data:', {
+                    ingredient: ingredientSelect?.value,
+                    qty: qtyInput?.value,
+                    unit: unitSelect?.value
+                });
+                
+                if (!ingredientSelect || !ingredientSelect.value || !qtyInput || !qtyInput.value || !unitSelect || !unitSelect.value) {
+                    hasError = true;
+                    return;
+                }
+                
+                ingredientsData.push({
+                    ingredient_id: ingredientSelect.value,
+                    qty: parseFloat(qtyInput.value),
+                    unit: unitSelect.value
+                });
+            });
+            
+            if (hasError) {
+                alert('Please fill in all ingredient fields!');
+                return;
+            }
+            
+            if (ingredientsData.length === 0) {
+                alert('Please add at least one ingredient!');
+                return;
+            }
+            
+            // Store ingredients data as JSON
+            const jsonData = JSON.stringify(ingredientsData);
+            console.log('Setting ingredients JSON:', jsonData);
+            
+            ingredientsDataInput.value = jsonData;
+            
+            console.log('Hidden field value is now:', ingredientsDataInput.value);
+            console.log('Verifying in DOM:', document.getElementById('id_ingredients_data').value);
+            
+            // Now click the real submit button
+            console.log('Clicking real submit button...');
+            realSubmitBtn.click();
+        });
+    } else {
+        console.error('Required elements not found:', {
+            saveBtn: !!saveBtn,
+            form: !!form,
+            hiddenInput: !!ingredientsDataInput
+        });
+    }
+});
+</script>
+{% endblock %}

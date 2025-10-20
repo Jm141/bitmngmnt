@@ -1,0 +1,165 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-industry me-2"></i>{{ title }}</h2>
+            <p class="text-muted">Produce finished goods from recipes</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:recipe_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Recipes
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Production Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="productionForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.recipe.id_for_label }}" class="form-label">{{ form.recipe.label }} *</label>
+                                {{ form.recipe }}
+                                {% if form.recipe.errors %}
+                                    <div class="text-danger">{{ form.recipe.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">Select the recipe to produce</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.production_qty.id_for_label }}" class="form-label">{{ form.production_qty.label }} *</label>
+                                {{ form.production_qty }}
+                                {% if form.production_qty.errors %}
+                                    <div class="text-danger">{{ form.production_qty.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">How many units to produce</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.unit_cost.id_for_label }}" class="form-label">{{ form.unit_cost.label }}</label>
+                                {{ form.unit_cost }}
+                                {% if form.unit_cost.errors %}
+                                    <div class="text-danger">{{ form.unit_cost.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">{{ form.unit_cost.help_text }}</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.lot_no.id_for_label }}" class="form-label">{{ form.lot_no.label }} *</label>
+                                {{ form.lot_no }}
+                                {% if form.lot_no.errors %}
+                                    <div class="text-danger">{{ form.lot_no.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">Unique identifier for this production batch</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.expires_at.id_for_label }}" class="form-label">{{ form.expires_at.label }}</label>
+                                {{ form.expires_at }}
+                                {% if form.expires_at.errors %}
+                                    <div class="text-danger">{{ form.expires_at.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted">For perishable products</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="text-danger">{{ form.notes.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'inventory:recipe_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-industry me-2"></i>Start Production
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Production Guidelines</h6>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold">How Production Works</h6>
+                    <ol class="small">
+                        <li>Select a recipe</li>
+                        <li>Enter quantity to produce</li>
+                        <li>Set unit cost (or leave blank for auto-calculation)</li>
+                        <li>Assign a lot number</li>
+                        <li>System will:
+                            <ul>
+                                <li>Check ingredient availability</li>
+                                <li>Deduct ingredients from stock</li>
+                                <li>Add finished goods to inventory</li>
+                            </ul>
+                        </li>
+                    </ol>
+
+                    <hr>
+
+                    <h6 class="fw-bold">Unit Cost</h6>
+                    <p class="small mb-0">
+                        If you leave the unit cost blank, the system will automatically calculate it based on the recipe's ingredient costs. You can also manually enter a cost if you want to include labor, overhead, or other expenses.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Important</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="small mb-0">
+                        <li>Ensure sufficient ingredients are in stock</li>
+                        <li>Lot numbers must be unique</li>
+                        <li>Production cannot be undone</li>
+                        <li>All ingredient consumption will be recorded</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('productionForm');
+    const lotNoInput = document.getElementById('id_lot_no');
+    
+    // Auto-generate lot number if empty
+    if (lotNoInput && !lotNoInput.value) {
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+        const timeStr = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        lotNoInput.value = `LOT-${dateStr}-${timeStr}`;
+    }
+});
+</script>
+{% endblock %}

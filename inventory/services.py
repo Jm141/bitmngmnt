@@ -76,31 +76,61 @@ class InventoryService:
     @transaction.atomic
     def consume_stock(item, qty, reason, user, lot=None, ref_no=None, notes=None):
         """
-        Consume stock from inventory
+        Consume stock from inventory with automatic overflow to next lots
         """
         qty = Decimal(str(qty))
+        remaining_qty = qty
         
         if lot:
-            # Consume from specific lot
-            if lot.qty < qty:
-                raise ValueError(f"Insufficient stock in lot. Available: {lot.qty}")
+            # Start consuming from specific lot, overflow to next lots if needed
+            # First, consume what we can from the selected lot
+            qty_from_selected = min(lot.qty, remaining_qty)
             
-            # Update lot quantity
-            lot.qty -= qty
-            lot.save()
+            if qty_from_selected > 0:
+                lot.qty -= qty_from_selected
+                lot.save()
+                
+                # Create movement record for selected lot
+                StockMovement.objects.create(
+                    item=item,
+                    lot=lot,
+                    movement_type='consume',
+                    qty=qty_from_selected,
+                    unit=item.unit,
+                    reason=reason,
+                    ref_no=ref_no,
+                    notes=notes,
+                    created_by=user
+                )
+                
+                remaining_qty -= qty_from_selected
             
-            # Create movement record
-            StockMovement.objects.create(
-                item=item,
-                lot=lot,
-                movement_type='consume',
-                qty=qty,
-                unit=item.unit,
-                reason=reason,
-                ref_no=ref_no,
-                notes=notes,
-                created_by=user
-            )
+            # If still need more, consume from other lots using FEFO/FIFO
+            if remaining_qty > 0:
+                # Get other available lots (excluding the one we just used)
+                consumption_plan = InventoryService.calculate_consumption_lots(item, remaining_qty)
+                
+                for next_lot, qty_to_consume in consumption_plan:
+                    # Skip the lot we already consumed from
+                    if next_lot.id == lot.id:
+                        continue
+                    
+                    # Update lot quantity
+                    next_lot.qty -= qty_to_consume
+                    next_lot.save()
+                    
+                    # Create movement record
+                    StockMovement.objects.create(
+                        item=item,
+                        lot=next_lot,
+                        movement_type='consume',
+                        qty=qty_to_consume,
+                        unit=item.unit,
+                        reason=reason,
+                        ref_no=ref_no,
+                        notes=f"{notes} (overflow from lot {lot.lot_no})" if notes else f"Overflow from lot {lot.lot_no}",
+                        created_by=user
+                    )
         else:
             # Auto-select lots using FEFO/FIFO
             consumption_plan = InventoryService.calculate_consumption_lots(item, qty)
@@ -159,9 +189,9 @@ class InventoryService:
     
     @staticmethod
     @transaction.atomic
-    def produce_stock(recipe, production_qty, lot_no, user, expires_at=None, notes=None):
+    def produce_stock(recipe, production_qty, lot_no, user, expires_at=None, notes=None, unit_cost=None):
         """
-        Produce stock using recipe
+        Produce stock using recipe with optional unit cost
         """
         # Calculate required ingredients
         required_ingredients = []
@@ -205,6 +235,7 @@ class InventoryService:
             lot_no=lot_no,
             qty=production_qty,
             unit=recipe.yield_unit,
+            unit_cost=unit_cost or 0,
             expires_at=expires_at,
             notes=notes,
             created_by=user

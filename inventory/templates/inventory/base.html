@@ -59,6 +59,10 @@
             .main-content {
                 margin-left: 16rem;
             }
+            
+            .main-content.sidebar-collapsed {
+                margin-left: 4.5rem;
+            }
         }
         
         /* Header */
@@ -203,7 +207,7 @@
             background: var(--card);
             border-right: 1px solid var(--border);
             transform: translateX(-100%);
-            transition: transform 0.3s ease;
+            transition: all 0.3s ease;
             z-index: 50;
             display: flex;
             flex-direction: column;
@@ -212,6 +216,10 @@
         @media (min-width: 1024px) {
             .sidebar {
                 transform: translateX(0);
+            }
+            
+            .sidebar.collapsed {
+                width: 4.5rem;
             }
         }
         
@@ -245,6 +253,57 @@
             font-size: 1.25rem;
             font-weight: 600;
             color: var(--text);
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar.collapsed .logo-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+        
+        .sidebar.collapsed .nav-item span {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+        
+        .sidebar.collapsed .nav-item {
+            justify-content: center;
+        }
+        
+        .collapse-toggle {
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text);
+            transition: all 0.2s ease;
+        }
+        
+        @media (min-width: 1024px) {
+            .collapse-toggle {
+                display: flex;
+            }
+        }
+        
+        .collapse-toggle:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        
+        .sidebar.collapsed .collapse-toggle i {
+            transform: rotate(180deg);
         }
         
         .sidebar-close {
@@ -1059,14 +1118,17 @@
     <div class="dashboard-layout">
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
+            <div class="sidebar-header" style="position: relative;">
                 <div class="sidebar-logo">
                     <div class="logo-icon"></div>
                     <span class="logo-text">Inventra</span>
                 </div>
                 <button class="sidebar-close" id="sidebarClose">
                     <i class="fas fa-times"></i>
-            </button>
+                </button>
+                <button class="collapse-toggle" id="collapseToggle" title="Collapse sidebar">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
             </div>
 
             <nav class="sidebar-nav">
@@ -1074,16 +1136,16 @@
                     {# SUPPLIER NAVIGATION - Simple and focused #}
                     <a class="nav-item {% if request.resolver_match.url_name == 'supplier_dashboard' %}active{% endif %}" href="{% url 'inventory:supplier_dashboard' %}">
                         <i class="fas fa-house nav-icon"></i>
-                        Dashboard
+                        <span>Dashboard</span>
                     </a>
                     <a class="nav-item {% if 'supplier_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:supplier_orders' %}">
                         <i class="fas fa-receipt nav-icon"></i>
-                        My Orders
+                        <span>My Orders</span>
                     </a>
-                    <a class="nav-item" href="{% url 'inventory:logout' %}">
+                    <!-- <a class="nav-item" href="{% url 'inventory:logout' %}">
                         <i class="fas fa-sign-out-alt nav-icon"></i>
                         Logout
-                    </a>
+                    </a> -->
                 {% else %}
                     {# NAVIGATION BASED ON USER ROLE #}
                     
@@ -1091,109 +1153,109 @@
                         {# STAFF NAVIGATION - Based on permissions #}
                         <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'inventory:dashboard' %}">
                             <i class="fas fa-house nav-icon"></i>
-                            Dashboard
+                            <span>Dashboard</span>
                         </a>
                         
                         {% if user|has_perm:'inventory_read' %}
                         <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/">
                             <i class="fas fa-box nav-icon"></i>
-                            Inventory
+                            <span>Inventory</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
                             <i class="fas fa-bag-shopping nav-icon"></i>
-                            Items
+                            <span>Items</span>
                         </a>
                         {% endif %}
                         
                         {% if user|has_perm:'inventory_write' %}
                         <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
                             <i class="fas fa-shopping-cart nav-icon"></i>
-                            Purchase Orders
+                            <span>Purchase Orders</span>
                         </a>
                         {% endif %}
                         
                         {% if user|has_perm:'inventory_read' %}
                         <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
                             <i class="fas fa-truck nav-icon"></i>
-                            Suppliers
+                            <span>Suppliers</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
                             <i class="fas fa-book nav-icon"></i>
-                            Recipes
+                            <span>Recipes</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
                             <i class="fas fa-calendar-times nav-icon"></i>
-                            Expiration Tracker
+                            <span>Expiration Tracker</span>
                         </a>
                         {% endif %}
                         
                         {% if user|has_perm:'reports_read' %}
                         <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
                             <i class="fas fa-chart-bar nav-icon"></i>
-                            Reports
+                            <span>Reports</span>
                         </a>
                         {% endif %}
                         
                         <a class="nav-item {% if request.resolver_match.url_name == 'attendance_dashboard' %}active{% endif %}" href="{% url 'inventory:attendance_dashboard' %}">
                             <i class="fas fa-clock nav-icon"></i>
-                            My Attendance
+                            <span>My Attendance</span>
                         </a>
                     
                     {% else %}
                         {# ADMIN/SUPER_ADMIN NAVIGATION - Full features #}
                         <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'inventory:dashboard' %}">
                             <i class="fas fa-house nav-icon"></i>
-                            Dashboard
+                            <span>Dashboard</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/" onclick="console.log('Inventory link clicked:', this.href);">
                             <i class="fas fa-box nav-icon"></i>
-                            Inventory
+                            <span>Inventory</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' or request.resolver_match.url_name == 'item_create' or request.resolver_match.url_name == 'item_update' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
                             <i class="fas fa-bag-shopping nav-icon"></i>
-                            Items
+                            <span>Items</span>
                         </a>
                         <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
                             <i class="fas fa-shopping-cart nav-icon"></i>
-                            Purchase Orders
+                            <span>Purchase Orders</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
                             <i class="fas fa-truck nav-icon"></i>
-                            Suppliers
+                            <span>Suppliers</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' or request.resolver_match.url_name == 'recipe_create' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
                             <i class="fas fa-book nav-icon"></i>
-                            Recipes
+                            <span>Recipes</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
                             <i class="fas fa-calendar-times nav-icon"></i>
-                            Expiration Tracker
+                            <span>Expiration Tracker</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
                             <i class="fas fa-chart-bar nav-icon"></i>
-                            Reports
+                            <span>Reports</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'inventory:user_list' %}">
                             <i class="fas fa-users nav-icon"></i>
-                            Team
+                            <span>Team</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'admin_attendance_overview' %}active{% endif %}" href="{% url 'inventory:admin_attendance_overview' %}">
                             <i class="fas fa-calendar-check nav-icon"></i>
-                            Attendance Overview
+                            <span>Attendance Overview</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
                             <i class="fas fa-history nav-icon"></i>
-                            Activity Logs
+                            <span>Activity Logs</span>
                         </a>
                         {% if user.role == 'super_admin' %}
                         <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
                             <i class="fas fa-clipboard-list nav-icon"></i>
-                            Audit Logs
+                            <span>Audit Logs</span>
                         </a>
                         {% endif %}
                         <a class="nav-item" href="#">
                             <i class="fas fa-gear nav-icon"></i>
-                            Settings
+                            <span>Settings</span>
                         </a>
                     {% endif %}
                 {% endif %}
@@ -1286,10 +1348,33 @@
             const sidebar = document.getElementById('sidebar');
             const sidebarOverlay = document.getElementById('sidebarOverlay');
             const sidebarClose = document.getElementById('sidebarClose');
+            const collapseToggle = document.getElementById('collapseToggle');
+            const mainContent = document.querySelector('.main-content');
             const userMenuButton = document.getElementById('userMenuButton');
             const userDropdown = document.getElementById('userDropdown');
 
-            // Toggle sidebar
+            // Load collapsed state from localStorage
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                if (mainContent) {
+                    mainContent.classList.add('sidebar-collapsed');
+                }
+            }
+
+            // Toggle sidebar collapse (desktop)
+            if (collapseToggle) {
+                collapseToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('collapsed');
+                    if (mainContent) {
+                        mainContent.classList.toggle('sidebar-collapsed');
+                    }
+                    // Save state
+                    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+                });
+            }
+
+            // Toggle sidebar (mobile)
             function toggleSidebar() {
                 sidebar.classList.toggle('open');
                 sidebarOverlay.classList.toggle('show');

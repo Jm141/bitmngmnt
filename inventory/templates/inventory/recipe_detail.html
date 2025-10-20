@@ -1,0 +1,215 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}{{ recipe.name }} - Recipe Details{% endblock %}
+{% block page_title %}Recipe Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-book me-2"></i>{{ recipe.name }}</h2>
+            <p class="text-muted">{{ recipe.product.name }} Recipe</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:recipe_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Recipes
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Recipe Info Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Recipe Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Recipe Name:</strong></p>
+                            <p class="text-muted">{{ recipe.name }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Product:</strong></p>
+                            <p class="text-muted">{{ recipe.product.name }} ({{ recipe.product.code }})</p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Yield:</strong></p>
+                            <p class="text-muted">{{ recipe.yield_qty }} {{ recipe.get_yield_unit_display }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Status:</strong></p>
+                            {% if recipe.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if recipe.description %}
+                    <div class="mb-3">
+                        <p class="mb-2"><strong>Description:</strong></p>
+                        <p class="text-muted">{{ recipe.description }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Created By:</strong></p>
+                            <p class="text-muted">{{ recipe.created_by.get_full_name|default:recipe.created_by.username }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Created At:</strong></p>
+                            <p class="text-muted">{{ recipe.created_at|date:"M d, Y H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ingredients Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Ingredients</h5>
+                </div>
+                <div class="card-body">
+                    {% if recipe_items %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Ingredient</th>
+                                        <th>Quantity</th>
+                                        <th>Unit</th>
+                                        <th>Code</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in recipe_items %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            <strong>{{ item.ingredient.name }}</strong>
+                                            {% if item.notes %}
+                                            <br><small class="text-muted">{{ item.notes }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ item.qty }}</td>
+                                        <td>{{ item.get_unit_display }}</td>
+                                        <td><code>{{ item.ingredient.code }}</code></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>No ingredients added yet.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Preparation Steps Card -->
+            {% if recipe.steps %}
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Preparation Steps</h5>
+                </div>
+                <div class="card-body">
+                    <div class="steps-content">
+                        {{ recipe.steps|linebreaks }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Cost Summary Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-calculator me-2"></i>Cost Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Cost:</span>
+                        <strong>₱{{ total_cost|floatformat:2 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Cost per Unit:</span>
+                        <strong>₱{{ cost_per_unit|floatformat:2 }}</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <span>Yield:</span>
+                        <strong>{{ recipe.yield_qty }} {{ recipe.get_yield_unit_display }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Quick Stats</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Ingredients:</span>
+                        <strong>{{ recipe_items.count }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Product Category:</span>
+                        <strong>{{ recipe.product.get_category_display }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Last Updated:</span>
+                        <strong>{{ recipe.updated_at|date:"M d, Y" }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'inventory:production_create' %}" class="btn btn-primary">
+                            <i class="fas fa-industry me-2"></i>Create Production
+                        </a>
+                        <button class="btn btn-outline-secondary" disabled>
+                            <i class="fas fa-edit me-2"></i>Edit Recipe (Coming Soon)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Future Feature Note -->
+            <div class="alert alert-light mt-3">
+                <h6 class="alert-heading"><i class="fas fa-lightbulb me-2"></i>Future Feature</h6>
+                <p class="small mb-0">
+                    When you create a product using this recipe, the system will automatically calculate 
+                    and deduct the required ingredients based on the output quantity.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.steps-content {
+    white-space: pre-wrap;
+    line-height: 1.8;
+}
+</style>
+{% endblock %}
