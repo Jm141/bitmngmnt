@@ -198,8 +198,8 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if production.lot and production.lot.unit_cost %}
-                                        <strong>₱{{ production.qty|mul:production.lot.unit_cost|floatformat:2 }}</strong>
+                                        {% if production.total_value %}
+                                        <strong>₱{{ production.total_value|floatformat:2 }}</strong>
                                         {% else %}
                                         <span class="text-muted">-</span>
                                         {% endif %}

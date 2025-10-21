@@ -8,6 +8,7 @@ from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
+import pytz
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -311,13 +312,42 @@ def attendance_dashboard(request):
         next_month, next_year = month + 1, year
     
     # Get today's production for staff dashboard
+    manila_tz = pytz.timezone('Asia/Manila')
+    manila_now = timezone.now().astimezone(manila_tz)
+    today_date = manila_now.date()
+    
+    # Get start and end of today in Manila time
+    today_start = manila_tz.localize(datetime.combine(today_date, datetime.min.time()))
+    today_end = manila_tz.localize(datetime.combine(today_date, datetime.max.time()))
+    
     today_productions = StockMovement.objects.filter(
         movement_type='produce',
-        timestamp__date=today
+        timestamp__gte=today_start,
+        timestamp__lte=today_end
     ).select_related('item', 'lot', 'created_by').order_by('-timestamp')
     
     today_total_items = today_productions.count()
     today_total_qty = sum(p.qty for p in today_productions)
+    
+    # Calculate ingredients for today's productions in staff dashboard
+    for production in today_productions:
+        try:
+            recipe = Recipe.objects.filter(product=production.item, is_active=True).first()
+            if recipe:
+                ingredients_used = []
+                for recipe_item in recipe.recipe_items.all():
+                    qty_needed = float(recipe_item.qty) * float(production.qty) / float(recipe.yield_qty)
+                    qty_needed = qty_needed * recipe_item.get_adjusted_qty() / float(recipe_item.qty)
+                    ingredients_used.append({
+                        'ingredient': recipe_item.ingredient,
+                        'qty': qty_needed,
+                        'unit': recipe_item.unit
+                    })
+                production.ingredients_used = ingredients_used
+            else:
+                production.ingredients_used = []
+        except Exception:
+            production.ingredients_used = []
 
     context = {
         'target_user': target_user,
@@ -1433,10 +1463,19 @@ def production_list(request):
         productions = productions.filter(item__name__icontains=recipe_filter)
     
     # Get today's production for quick view
-    today = timezone.now().date()
+    # Use Manila timezone
+    manila_tz = pytz.timezone('Asia/Manila')
+    manila_now = timezone.now().astimezone(manila_tz)
+    today = manila_now.date()
+    
+    # Get start and end of today in Manila time
+    today_start = manila_tz.localize(datetime.combine(today, datetime.min.time()))
+    today_end = manila_tz.localize(datetime.combine(today, datetime.max.time()))
+    
     today_productions = StockMovement.objects.filter(
         movement_type='produce',
-        timestamp__date=today
+        timestamp__gte=today_start,
+        timestamp__lte=today_end
     ).select_related('item', 'lot', 'created_by').order_by('-timestamp')
     
     # Calculate today's summary
@@ -1450,6 +1489,12 @@ def production_list(request):
     
     # Calculate ingredients used for each production
     for production in productions:
+        # Calculate total value
+        if production.lot and production.lot.unit_cost:
+            production.total_value = float(production.qty) * float(production.lot.unit_cost)
+        else:
+            production.total_value = None
+            
         # Find the recipe for this product (get the first active one if multiple exist)
         try:
             recipe = Recipe.objects.filter(product=production.item, is_active=True).first()
