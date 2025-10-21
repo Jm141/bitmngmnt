@@ -225,6 +225,118 @@
     </div>
 
     <!-- Attendance Detail Modal -->
+    <style>
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+    }
+    
+    .calendar-header {
+        display: contents;
+    }
+    
+    .calendar-day-header {
+        text-align: center;
+        font-weight: 600;
+        padding: 0.75rem;
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .calendar-day {
+        aspect-ratio: 1;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+        position: relative;
+        min-height: 80px;
+    }
+    
+    .calendar-day.empty {
+        border: none;
+        cursor: default;
+        background: transparent;
+    }
+    
+    .calendar-day:not(.empty):hover {
+        border-color: #c9a27b;
+        transform: scale(1.05);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .calendar-day.today {
+        border-color: #3b82f6;
+        border-width: 3px;
+        background: #eff6ff;
+    }
+    
+    .calendar-day.complete {
+        background: #f0fdf4;
+        border-color: #16a34a;
+    }
+    
+    .calendar-day.partial {
+        background: #fefce8;
+        border-color: #ca8a04;
+    }
+    
+    .calendar-day.absent {
+        background: #f9fafb;
+        border-color: #d1d5db;
+    }
+    
+    .calendar-day-number {
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .calendar-day-indicator {
+        font-size: 1.25rem;
+    }
+    
+    .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-content {
+        position: relative;
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        max-width: 32rem;
+        width: 90%;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    </style>
+
+    <!-- Attendance Detail Modal -->
     <div id="attendanceModal" class="modal" style="display: none;">
         <div class="modal-overlay" onclick="closeModal()"></div>
         <div class="modal-content">
@@ -242,7 +354,6 @@
 </div>
 {% endblock %}
 
-{% block extra_css %}
 <style>
     .calendar-grid {
         display: grid;
@@ -379,9 +490,7 @@
         color: #111827;
     }
 </style>
-{% endblock %}
 
-{% block extra_js %}
 <script>
 (function(){
     // Clock in/out functionality
@@ -484,4 +593,3 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
-{% endblock %}
