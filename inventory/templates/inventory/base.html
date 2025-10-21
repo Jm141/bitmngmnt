@@ -263,13 +263,27 @@
         }
         
         .sidebar.collapsed .nav-item span {
-            opacity: 0;
-            width: 0;
-            overflow: hidden;
+            display: none;
         }
         
         .sidebar.collapsed .nav-item {
             justify-content: center;
+        }
+        
+        .sidebar.collapsed .nav-parent span {
+            display: none;
+        }
+        
+        .sidebar.collapsed .nav-parent {
+            justify-content: center;
+        }
+        
+        .sidebar.collapsed .nav-child span {
+            display: none;
+        }
+        
+        .sidebar.collapsed .user-section-info {
+            display: none;
         }
         
         .collapse-toggle {
@@ -1319,13 +1333,17 @@
                                     <i class="fas fa-bag-shopping nav-child-icon"></i>
                                     <span>Items</span>
                                 </a>
-                                <a class="nav-child {% if request.resolver_match.url_name == 'stock_receive' %}active{% endif %}" href="{% url 'inventory:stock_receive' %}">
+                                <!-- <a class="nav-child {% if request.resolver_match.url_name == 'stock_receive' %}active{% endif %}" href="{% url 'inventory:stock_receive' %}">
                                     <i class="fas fa-arrow-down nav-child-icon"></i>
                                     <span>Receive Stock</span>
-                                </a>
-                                <a class="nav-child {% if request.resolver_match.url_name == 'stock_consume' %}active{% endif %}" href="{% url 'inventory:stock_consume' %}">
+                                </a> -->
+                                <!-- <a class="nav-child {% if request.resolver_match.url_name == 'stock_consume' %}active{% endif %}" href="{% url 'inventory:stock_consume' %}">
                                     <i class="fas fa-arrow-up nav-child-icon"></i>
                                     <span>Consume Stock</span>
+                                </a> -->
+                                <a class="nav-child {% if request.resolver_match.url_name == 'damage_log' %}active{% endif %}" href="{% url 'inventory:damage_log' %}">
+                                    <i class="fas fa-exclamation-triangle nav-child-icon"></i>
+                                    <span>Log Damage/Loss</span>
                                 </a>
                                 <a class="nav-child {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
                                     <i class="fas fa-calendar-times nav-child-icon"></i>
@@ -1390,11 +1408,30 @@
                             <span>Suppliers</span>
                         </a>
                         
-                        <!-- Reports -->
-                        <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
-                            <i class="fas fa-chart-bar nav-icon"></i>
-                            <span>Reports</span>
-                        </a>
+                        <!-- Reports Group -->
+                        <div class="nav-group">
+                            <button class="nav-parent" data-target="reports-menu">
+                                <div class="nav-parent-content">
+                                    <i class="fas fa-chart-bar nav-icon"></i>
+                                    <span>Reports</span>
+                                </div>
+                                <i class="fas fa-chevron-right nav-parent-toggle"></i>
+                            </button>
+                            <div class="nav-children" id="reports-menu">
+                                <a class="nav-child {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
+                                    <i class="fas fa-boxes nav-child-icon"></i>
+                                    <span>Stock Report</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'damage_report' %}active{% endif %}" href="{% url 'inventory:damage_report' %}">
+                                    <i class="fas fa-exclamation-triangle nav-child-icon"></i>
+                                    <span>Damage/Loss Report</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
+                                    <i class="fas fa-history nav-child-icon"></i>
+                                    <span>Activity Logs</span>
+                                </a>
+                            </div>
+                        </div>
                         
                         <!-- Team Management Group -->
                         <div class="nav-group">
@@ -1420,12 +1457,6 @@
                                 </a>
                             </div>
                         </div>
-                        
-                        <!-- Activity Logs -->
-                        <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
-                            <i class="fas fa-history nav-icon"></i>
-                            <span>Activity Logs</span>
-                        </a>
                     {% endif %}
                 {% endif %}
             </nav>
@@ -1593,13 +1624,35 @@
                     const targetMenu = document.getElementById(targetId);
                     
                     if (targetMenu) {
-                        // Toggle this menu
                         const isExpanded = targetMenu.classList.contains('show');
+                        
+                        // Close all other menus first
+                        if (!isExpanded) {
+                            document.querySelectorAll('.nav-children.show').forEach(function(menu) {
+                                if (menu.id !== targetId) {
+                                    menu.classList.remove('show');
+                                    const otherParent = document.querySelector(`[data-target="${menu.id}"]`);
+                                    if (otherParent) {
+                                        otherParent.classList.remove('expanded');
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // Toggle this menu
                         targetMenu.classList.toggle('show');
                         this.classList.toggle('expanded');
                         
                         // Save state to localStorage
                         const menuState = JSON.parse(localStorage.getItem('navMenuState') || '{}');
+                        // Clear all other menu states when opening a new one
+                        if (!isExpanded) {
+                            Object.keys(menuState).forEach(key => {
+                                if (key !== targetId) {
+                                    menuState[key] = false;
+                                }
+                            });
+                        }
                         menuState[targetId] = !isExpanded;
                         localStorage.setItem('navMenuState', JSON.stringify(menuState));
                     }

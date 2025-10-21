@@ -19,7 +19,7 @@ from .security import (
     get_user_permissions, check_user_permissions, get_manila_now,
     supplier_required, supplier_or_admin_required
 )
-from .forms import UserForm, UserAccessForm, UserLinksForm, SupplierForm, ItemForm, StockLotForm, StockMovementForm, RecipeForm, RecipeItemForm, StockReceiveForm, StockConsumeForm, ProductionForm, PurchaseOrderForm, PurchaseOrderItemForm, PurchaseOrderApproveForm, QRCodeScanForm
+from .forms import UserForm, UserAccessForm, UserLinksForm, SupplierForm, ItemForm, StockLotForm, StockMovementForm, RecipeForm, RecipeItemForm, StockReceiveForm, StockConsumeForm, ProductionForm, PurchaseOrderForm, PurchaseOrderItemForm, PurchaseOrderApproveForm, QRCodeScanForm, DamageLogForm
 from .services import InventoryService, RecipeService, PurchaseOrderService
 import json
 from django.http import HttpResponseBadRequest
@@ -69,7 +69,7 @@ def unified_login(request):
         else:
             messages.error(request, "Invalid username or password.")
     
-    return render(request, 'inventory/login.html')
+    return render(request, 'inventory/auth/login.html')
 
 
 @login_required
@@ -386,7 +386,7 @@ def attendance_dashboard(request):
         'today_total_qty': today_total_qty,
         'today': today,
     }
-    return render(request, 'inventory/attendance_dashboard.html', context)
+    return render(request, 'inventory/users/attendance_dashboard.html', context)
 
 
 @login_required
@@ -483,7 +483,7 @@ def user_list(request):
         request=request
     )
     
-    return render(request, 'inventory/user_list.html', context)
+    return render(request, 'inventory/users/user_list.html', context)
 
 
 @login_required
@@ -541,7 +541,7 @@ def user_detail(request, user_id):
         request=request
     )
     
-    return render(request, 'inventory/user_detail.html', context)
+    return render(request, 'inventory/users/user_detail.html', context)
 
 
 @login_required
@@ -557,7 +557,7 @@ def user_create(request):
             is_valid, error_msg = validate_user_input(form.cleaned_data)
             if not is_valid:
                 messages.error(request, error_msg)
-                return render(request, 'inventory/user_form.html', {'form': form})
+                return render(request, 'inventory/users/user_form.html', {'form': form})
             
             # Sanitize input
             cleaned_data = sanitize_input(form.cleaned_data)
@@ -566,11 +566,11 @@ def user_create(request):
             role = cleaned_data.get('role', 'staff')
             if role == 'super_admin' and request.user.role != 'super_admin':
                 messages.error(request, "Only Super Admin can create Super Admin users.")
-                return render(request, 'inventory/user_form.html', {'form': form})
+                return render(request, 'inventory/users/user_form.html', {'form': form})
             
             if role == 'admin' and request.user.role not in ['admin', 'super_admin']:
                 messages.error(request, "Only Admin or Super Admin can create Admin users.")
-                return render(request, 'inventory/user_form.html', {'form': form})
+                return render(request, 'inventory/users/user_form.html', {'form': form})
             
             # Create user - let the form handle username generation and saving
             user = form.save(commit=False)
@@ -598,7 +598,7 @@ def user_create(request):
         'can_create_admin': request.user.role == 'super_admin',
     }
     
-    return render(request, 'inventory/user_form.html', context)
+    return render(request, 'inventory/users/user_form.html', context)
 
 
 @login_required
@@ -632,7 +632,7 @@ def user_update(request, user_id):
             is_valid, error_msg = validate_user_input(form.cleaned_data)
             if not is_valid:
                 messages.error(request, error_msg)
-                return render(request, 'inventory/user_form.html', {'form': form, 'user': user})
+                return render(request, 'inventory/users/user_form.html', {'form': form, 'user': user})
             
             # Sanitize input
             cleaned_data = sanitize_input(form.cleaned_data)
@@ -642,11 +642,11 @@ def user_update(request, user_id):
             if new_role != user.role:
                 if new_role == 'super_admin' and request.user.role != 'super_admin':
                     messages.error(request, "Only Super Admin can promote users to Super Admin.")
-                    return render(request, 'inventory/user_form.html', {'form': form, 'user': user})
+                    return render(request, 'inventory/users/user_form.html', {'form': form, 'user': user})
                 
                 if new_role == 'admin' and request.user.role not in ['admin', 'super_admin']:
                     messages.error(request, "Only Admin or Super Admin can promote users to Admin.")
-                    return render(request, 'inventory/user_form.html', {'form': form, 'user': user})
+                    return render(request, 'inventory/users/user_form.html', {'form': form, 'user': user})
             
             # Update user
             form.save()
@@ -672,7 +672,7 @@ def user_update(request, user_id):
         'can_promote_admin': request.user.role == 'super_admin',
     }
     
-    return render(request, 'inventory/user_form.html', context)
+    return render(request, 'inventory/users/user_form.html', context)
 
 
 @login_required
@@ -703,7 +703,7 @@ def user_delete(request, user_id):
         'user': user,
     }
     
-    return render(request, 'inventory/user_confirm_delete.html', context)
+    return render(request, 'inventory/users/user_confirm_delete.html', context)
 
 
 @login_required
@@ -794,7 +794,7 @@ def user_permissions(request, user_id):
         'current_permission_types': current_permission_types,
     }
     
-    return render(request, 'inventory/user_permissions.html', context)
+    return render(request, 'inventory/users/user_permissions.html', context)
 
 
 @login_required
@@ -830,7 +830,7 @@ def audit_logs(request):
         'action_choices': AuditLog.ACTION_TYPES,
     }
     
-    return render(request, 'inventory/audit_logs.html', context)
+    return render(request, 'inventory/reports/audit_logs.html', context)
 
 
 @csrf_protect
@@ -940,7 +940,7 @@ def admin_attendance_overview(request):
         request=request
     )
     
-    return render(request, 'inventory/admin_attendance_overview.html', context)
+    return render(request, 'inventory/users/admin_attendance_overview.html', context)
 
 
 # --- DEBUG VIEWS ---
@@ -1130,7 +1130,7 @@ def item_list(request):
         'category_choices': Item.CATEGORY_CHOICES,
     }
     
-    return render(request, 'inventory/item_list.html', context)
+    return render(request, 'inventory/items/item_list.html', context)
 
 
 @login_required
@@ -1161,7 +1161,7 @@ def item_detail(request, item_id):
         'expiring_lots': expiring_lots,
     }
     
-    return render(request, 'inventory/item_detail.html', context)
+    return render(request, 'inventory/items/item_detail.html', context)
 
 
 @login_required
@@ -1196,7 +1196,7 @@ def item_create(request):
         'title': 'Create Item',
     }
     
-    return render(request, 'inventory/item_form.html', context)
+    return render(request, 'inventory/items/item_form.html', context)
 
 
 @login_required
@@ -1232,7 +1232,7 @@ def item_update(request, item_id):
         'title': f'Update Item: {item.code}',
     }
     
-    return render(request, 'inventory/item_form.html', context)
+    return render(request, 'inventory/items/item_form.html', context)
 
 
 @login_required
@@ -1288,7 +1288,7 @@ def stock_receive(request):
         'title': 'Receive Stock',
     }
     
-    return render(request, 'inventory/stock_receive.html', context)
+    return render(request, 'inventory/stock/stock_receive.html', context)
 
 
 @login_required
@@ -1384,7 +1384,135 @@ def stock_consume(request):
         'title': 'Consume Stock',
     }
     
-    return render(request, 'inventory/stock_consume.html', context)
+    return render(request, 'inventory/stock/stock_consume.html', context)
+
+
+@login_required
+@permission_required('inventory_write')
+def damage_log(request):
+    """
+    Log damaged or lost products
+    """
+    if request.method == 'POST':
+        form = DamageLogForm(request.POST)
+        if form.is_valid():
+            try:
+                item = form.cleaned_data['item']
+                lot = form.cleaned_data.get('lot')
+                qty = form.cleaned_data['qty']
+                unit = form.cleaned_data['unit']
+                damage_reason = form.cleaned_data['damage_reason']
+                description = form.cleaned_data['description']
+                ref_no = form.cleaned_data.get('ref_no')
+                
+                # Create damage movement
+                movement = StockMovement.objects.create(
+                    item=item,
+                    lot=lot,
+                    movement_type='damage',
+                    qty=qty,
+                    unit=unit,
+                    reason=f"{dict(StockMovement.DAMAGE_REASONS)[damage_reason]}: {description}",
+                    ref_no=ref_no,
+                    notes=description,
+                    created_by=request.user
+                )
+                
+                # Update lot quantity if lot specified
+                if lot:
+                    lot.qty -= qty
+                    lot.save()
+                
+                log_user_action(
+                    user=request.user,
+                    action_type='create',
+                    target_model='StockMovement',
+                    target_id=str(movement.id),
+                    description=f"Logged damage/loss: {item.code} - {qty} {unit} ({dict(StockMovement.DAMAGE_REASONS)[damage_reason]})",
+                    request=request
+                )
+                
+                messages.success(request, f"Damage/loss logged successfully. {qty} {unit} of {item.name} removed from inventory.")
+                return redirect('inventory:item_detail', item_id=item.id)
+                
+            except Exception as e:
+                messages.error(request, f"Error logging damage: {str(e)}")
+    else:
+        form = DamageLogForm()
+    
+    context = {
+        'form': form,
+        'title': 'Log Damaged/Lost Products',
+    }
+    
+    return render(request, 'inventory/stock/damage_log.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def damage_report(request):
+    """
+    View damage/loss report
+    """
+    # Get date range from request
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    damage_reason = request.GET.get('damage_reason')
+    
+    # Base query
+    damages = StockMovement.objects.filter(movement_type='damage').select_related('item', 'lot', 'created_by')
+    
+    # Apply filters
+    if start_date:
+        damages = damages.filter(timestamp__gte=start_date)
+    if end_date:
+        damages = damages.filter(timestamp__lte=end_date)
+    if damage_reason:
+        damages = damages.filter(reason__icontains=damage_reason)
+    
+    # Calculate statistics
+    total_incidents = damages.count()
+    
+    # Group by reason
+    reason_stats = {}
+    for reason_code, reason_label in StockMovement.DAMAGE_REASONS:
+        count = damages.filter(reason__icontains=reason_label).count()
+        if count > 0:
+            reason_stats[reason_label] = count
+    
+    # Group by item
+    item_stats = {}
+    for damage in damages:
+        item_name = damage.item.name
+        if item_name not in item_stats:
+            item_stats[item_name] = {'qty': 0, 'count': 0}
+        item_stats[item_name]['qty'] += float(damage.qty)
+        item_stats[item_name]['count'] += 1
+    
+    # Sort by count
+    item_stats = dict(sorted(item_stats.items(), key=lambda x: x[1]['count'], reverse=True)[:10])
+    
+    context = {
+        'damages': damages[:100],  # Limit to recent 100
+        'total_incidents': total_incidents,
+        'reason_stats': reason_stats,
+        'item_stats': item_stats,
+        'damage_reasons': StockMovement.DAMAGE_REASONS,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_reason': damage_reason,
+        'title': 'Damage/Loss Report',
+    }
+    
+    log_user_action(
+        user=request.user,
+        action_type='view',
+        target_model='StockMovement',
+        description="Viewed damage/loss report",
+        request=request
+    )
+    
+    return render(request, 'inventory/reports/damage_report.html', context)
 
 
 @login_required
@@ -1414,7 +1542,7 @@ def production_create(request):
                     messages.error(request, "Cannot produce due to insufficient ingredients:")
                     for missing in validation['missing_ingredients']:
                         messages.error(request, f"- {missing['ingredient'].name}: Need {missing['needed']}, Available {missing['available']}")
-                    return render(request, 'inventory/production_form.html', {'form': form, 'title': 'Production'})
+                    return render(request, 'inventory/production/production_form.html', {'form': form, 'title': 'Production'})
                 
                 # Proceed with production
                 lot = InventoryService.produce_stock(
@@ -1449,7 +1577,7 @@ def production_create(request):
         'title': 'Production',
     }
     
-    return render(request, 'inventory/production_form.html', context)
+    return render(request, 'inventory/production/production_form.html', context)
 
 
 @login_required
@@ -1569,7 +1697,7 @@ def production_list(request):
         'today': today,
     }
     
-    return render(request, 'inventory/production_list.html', context)
+    return render(request, 'inventory/production/production_list.html', context)
 
 
 @login_required
@@ -1589,7 +1717,7 @@ def supplier_list(request):
         'suppliers': suppliers,
     }
     
-    return render(request, 'inventory/supplier_list.html', context)
+    return render(request, 'inventory/suppliers/supplier_list.html', context)
 
 
 @login_required
@@ -1666,7 +1794,7 @@ def supplier_create(request):
         'title': 'Create Supplier',
     }
     
-    return render(request, 'inventory/supplier_form.html', context)
+    return render(request, 'inventory/suppliers/supplier_form.html', context)
 
 
 @login_required
@@ -1696,7 +1824,7 @@ def recipe_list(request):
         'recipes_with_cost': recipes_with_cost,
     }
     
-    return render(request, 'inventory/recipe_list.html', context)
+    return render(request, 'inventory/production/recipe_list.html', context)
 
 
 @login_required
@@ -1721,7 +1849,7 @@ def recipe_detail(request, recipe_id):
         'cost_per_unit': cost_per_unit,
     }
     
-    return render(request, 'inventory/recipe_detail.html', context)
+    return render(request, 'inventory/production/recipe_detail.html', context)
 
 
 @login_required
@@ -1799,7 +1927,7 @@ def recipe_create(request):
         'ingredients': ingredients,
     }
     
-    return render(request, 'inventory/recipe_form.html', context)
+    return render(request, 'inventory/production/recipe_form.html', context)
 
 
 @login_required
@@ -2001,7 +2129,7 @@ def stock_report(request):
         'category_choices': Item.CATEGORY_CHOICES,
     }
     
-    return render(request, 'inventory/stock_report.html', context)
+    return render(request, 'inventory/reports/stock_report.html', context)
 
 
 # --- PURCHASE ORDER VIEWS ---
@@ -2049,7 +2177,7 @@ def purchase_order_list(request):
         request=request
     )
     
-    return render(request, 'inventory/purchase_order_list.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_list.html', context)
 
 
 @login_required
@@ -2081,7 +2209,7 @@ def purchase_order_detail(request, order_id):
         request=request
     )
     
-    return render(request, 'inventory/purchase_order_detail.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_detail.html', context)
 
 
 @login_required
@@ -2178,7 +2306,7 @@ def purchase_order_receive(request, order_id):
         'today': timezone.now().date(),
     }
     
-    return render(request, 'inventory/purchase_order_receive.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_receive.html', context)
 
 
 @login_required
@@ -2263,7 +2391,7 @@ def purchase_order_create(request):
         'title': 'Create Purchase Order',
     }
     
-    return render(request, 'inventory/purchase_order_form.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_form.html', context)
 
 
 @login_required
@@ -2330,7 +2458,7 @@ def purchase_order_approve(request, order_id):
         'title': f'Supplier Approve Purchase Order: {order.order_no}',
     }
     
-    return render(request, 'inventory/purchase_order_approve.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_approve.html', context)
 
 
 @login_required
@@ -2374,7 +2502,7 @@ def purchase_order_admin_approve(request, order_id):
         'title': f'Admin Approve Purchase Order: {order.order_no}',
     }
     
-    return render(request, 'inventory/purchase_order_admin_approve.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_admin_approve.html', context)
 
 
 @login_required
@@ -2422,7 +2550,7 @@ def purchase_order_admin_reject(request, order_id):
         'title': f'Reject Purchase Order: {order.order_no}',
     }
     
-    return render(request, 'inventory/purchase_order_admin_reject.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_admin_reject.html', context)
 
 
 @login_required
@@ -2502,7 +2630,7 @@ def purchase_order_scan_receive(request):
         'title': 'Receive Purchase Order',
     }
     
-    return render(request, 'inventory/purchase_order_scan.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_scan.html', context)
 
 
 @login_required
@@ -2549,7 +2677,7 @@ def purchase_order_cancel(request, order_id):
         'title': f'Cancel Purchase Order: {order.order_no}',
     }
     
-    return render(request, 'inventory/purchase_order_cancel.html', context)
+    return render(request, 'inventory/purchase_orders/purchase_order_cancel.html', context)
 
 
 # --- SUPPLIER PORTAL VIEWS ---
@@ -2596,7 +2724,7 @@ def supplier_dashboard(request):
         request=request
     )
     
-    return render(request, 'inventory/supplier_dashboard.html', context)
+    return render(request, 'inventory/suppliers/supplier_dashboard.html', context)
 
 
 @login_required
@@ -2625,7 +2753,7 @@ def supplier_orders(request):
         'supplier': supplier,
     }
     
-    return render(request, 'inventory/supplier_orders.html', context)
+    return render(request, 'inventory/suppliers/supplier_orders.html', context)
 
 
 @login_required
@@ -2659,7 +2787,7 @@ def supplier_order_detail(request, order_id):
         request=request
     )
     
-    return render(request, 'inventory/supplier_order_detail.html', context)
+    return render(request, 'inventory/suppliers/supplier_order_detail.html', context)
 
 
 @login_required
@@ -2733,7 +2861,7 @@ def supplier_order_approve(request, order_id):
         'title': f'Approve Purchase Order: {order.order_no}',
     }
     
-    return render(request, 'inventory/supplier_order_approve.html', context)
+    return render(request, 'inventory/suppliers/supplier_order_approve.html', context)
 
 
 @login_required
@@ -2807,7 +2935,7 @@ def supplier_login(request):
         else:
             messages.error(request, "Invalid username or password.")
     
-    return render(request, 'inventory/supplier_login.html')
+    return render(request, 'inventory/suppliers/supplier_login.html')
 
 
 @login_required
@@ -2872,4 +3000,4 @@ def expiration_tracker(request):
         'fresh_count': fresh_count,
     }
     
-    return render(request, 'inventory/expiration_tracker.html', context)
+    return render(request, 'inventory/stock/expiration_tracker.html', context)

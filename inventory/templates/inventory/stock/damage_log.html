@@ -1,0 +1,195 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-exclamation-triangle me-2 text-danger"></i>{{ title }}</h2>
+            <p class="text-muted">Log damaged, lost, or spoiled products to maintain accurate inventory records</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:damage_report' %}" class="btn btn-outline-primary">
+                <i class="fas fa-chart-line me-2"></i>View Damage Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Warning Alert -->
+    <div class="alert alert-warning">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Important:</strong> Logging damage will permanently reduce inventory levels. Make sure to provide accurate information and detailed description of the incident.
+    </div>
+
+    <!-- Damage Log Form -->
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Damage/Loss Report Form</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" id="damageForm">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.item.id_for_label }}" class="form-label">
+                            {{ form.item.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.item }}
+                        {% if form.item.errors %}
+                            <div class="text-danger small">{{ form.item.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.lot.id_for_label }}" class="form-label">
+                            {{ form.lot.label }}
+                        </label>
+                        {{ form.lot }}
+                        <small class="form-text text-muted">{{ form.lot.help_text }}</small>
+                        {% if form.lot.errors %}
+                            <div class="text-danger small">{{ form.lot.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.qty.id_for_label }}" class="form-label">
+                            {{ form.qty.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.qty }}
+                        {% if form.qty.errors %}
+                            <div class="text-danger small">{{ form.qty.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.unit.id_for_label }}" class="form-label">
+                            {{ form.unit.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.unit }}
+                        {% if form.unit.errors %}
+                            <div class="text-danger small">{{ form.unit.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.damage_reason.id_for_label }}" class="form-label">
+                            {{ form.damage_reason.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.damage_reason }}
+                        {% if form.damage_reason.errors %}
+                            <div class="text-danger small">{{ form.damage_reason.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.ref_no.id_for_label }}" class="form-label">
+                            {{ form.ref_no.label }}
+                        </label>
+                        {{ form.ref_no }}
+                        {% if form.ref_no.errors %}
+                            <div class="text-danger small">{{ form.ref_no.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">
+                        {{ form.description.label }} <span class="text-danger">*</span>
+                    </label>
+                    {{ form.description }}
+                    <small class="form-text text-muted">{{ form.description.help_text }}</small>
+                    {% if form.description.errors %}
+                        <div class="text-danger small">{{ form.description.errors }}</div>
+                    {% endif %}
+                </div>
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <hr>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                    <button type="submit" class="btn btn-danger btn-lg">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Log Damage/Loss
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Quick Reference -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Damage Reason Guide</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><strong>Accident/Breakage:</strong> Dropped, broken, or physically damaged</li>
+                        <li class="mb-2"><strong>Spoiled/Expired:</strong> Past expiration date or gone bad</li>
+                        <li class="mb-2"><strong>Contaminated:</strong> Contaminated by foreign substances</li>
+                        <li class="mb-2"><strong>Defective Product:</strong> Manufacturing defects or quality issues</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><strong>Theft/Missing:</strong> Stolen or cannot be located</li>
+                        <li class="mb-2"><strong>Fire Damage:</strong> Damaged by fire or smoke</li>
+                        <li class="mb-2"><strong>Water Damage:</strong> Damaged by water or flooding</li>
+                        <li class="mb-2"><strong>Pest Damage:</strong> Damaged by rodents, insects, etc.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('damageForm').addEventListener('submit', function(e) {
+    const qty = document.getElementById('id_qty').value;
+    const item = document.getElementById('id_item').selectedOptions[0]?.text || 'selected item';
+    
+    if (!confirm(`⚠️ CONFIRM DAMAGE/LOSS\n\nYou are about to log ${qty} units of ${item} as damaged/lost.\n\nThis will permanently reduce inventory levels.\n\nAre you sure?`)) {
+        e.preventDefault();
+    }
+});
+
+// Update lot dropdown when item changes
+document.getElementById('id_item').addEventListener('change', function() {
+    const itemId = this.value;
+    const lotSelect = document.getElementById('id_lot');
+    
+    if (itemId) {
+        // Fetch lots for this item
+        fetch(`/api/item-lots/?item_id=${itemId}`)
+            .then(response => response.json())
+            .then(lots => {
+                lotSelect.innerHTML = '<option value="">---------</option>';
+                lots.forEach(lot => {
+                    const option = document.createElement('option');
+                    option.value = lot.id;
+                    option.textContent = `${lot.lot_no} (${lot.qty} ${lot.unit} available)`;
+                    lotSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching lots:', error));
+    }
+});
+</script>
+{% endblock %}

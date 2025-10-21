@@ -525,6 +525,19 @@ class StockMovement(models.Model):
         ('adjust', 'Adjust Stock'),
         ('transfer', 'Transfer Stock'),
         ('spoilage', 'Spoilage'),
+        ('damage', 'Damage/Loss'),
+    ]
+    
+    DAMAGE_REASONS = [
+        ('accident', 'Accident/Breakage'),
+        ('spoiled', 'Spoiled/Expired'),
+        ('contaminated', 'Contaminated'),
+        ('defective', 'Defective Product'),
+        ('theft', 'Theft/Missing'),
+        ('fire', 'Fire Damage'),
+        ('water', 'Water Damage'),
+        ('pest', 'Pest Damage'),
+        ('other', 'Other'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -554,7 +567,7 @@ class StockMovement(models.Model):
 
     def is_outbound(self):
         """Check if movement decreases stock"""
-        return self.movement_type in ['consume', 'spoilage', 'transfer']
+        return self.movement_type in ['consume', 'spoilage', 'transfer', 'damage']
 
 
 class Recipe(models.Model):

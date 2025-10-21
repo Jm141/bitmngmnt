@@ -942,3 +942,86 @@ class QRCodeScanForm(forms.Form):
             if not qr_code.startswith('PO-'):
                 raise ValidationError("Invalid QR code format. QR code must start with 'PO-'")
         return qr_code
+
+
+class DamageLogForm(forms.Form):
+    """
+    Form for logging damaged/lost products
+    """
+    item = forms.ModelChoiceField(
+        queryset=Item.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Item"
+    )
+    lot = forms.ModelChoiceField(
+        queryset=StockLot.objects.filter(qty__gt=0),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Lot (Optional)",
+        help_text="Select specific lot if applicable"
+    )
+    qty = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+        label="Quantity Damaged/Lost"
+    )
+    unit = forms.ChoiceField(
+        choices=Item.UNIT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Unit"
+    )
+    damage_reason = forms.ChoiceField(
+        choices=StockMovement.DAMAGE_REASONS,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Damage Reason"
+    )
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Describe what happened...'}),
+        label="Detailed Description",
+        help_text="Provide details about the incident"
+    )
+    ref_no = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Incident report number (optional)'}),
+        label="Reference Number"
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Update lot queryset dynamically based on selected item
+        if 'item' in self.data:
+            try:
+                item_id = self.data.get('item')
+                self.fields['lot'].queryset = StockLot.objects.filter(
+                    item_id=item_id, 
+                    qty__gt=0
+                ).order_by('-created_at')
+            except (ValueError, TypeError):
+                pass
+    
+    def clean_qty(self):
+        qty = self.cleaned_data.get('qty')
+        if qty is not None and qty <= 0:
+            raise ValidationError("Quantity must be greater than 0")
+        return qty
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        item = cleaned_data.get('item')
+        lot = cleaned_data.get('lot')
+        qty = cleaned_data.get('qty')
+        
+        # If lot is specified, check if enough quantity is available
+        if lot and qty:
+            if qty > lot.qty:
+                raise ValidationError(f"Cannot log {qty} units. Only {lot.qty} units available in lot {lot.lot_no}")
+        
+        # If no lot specified, check total item stock
+        elif item and qty:
+            current_stock = item.get_current_stock()
+            if qty > current_stock:
+                raise ValidationError(f"Cannot log {qty} units. Only {current_stock} units available in stock")
+        
+        return cleaned_data

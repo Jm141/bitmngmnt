@@ -1,0 +1,242 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-chart-line me-2"></i>{{ title }}</h2>
+            <p class="text-muted">Track and analyze damaged or lost inventory</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:damage_log' %}" class="btn btn-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>Log New Damage
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Total Incidents</h6>
+                    <h2 class="mb-0 text-danger">{{ total_incidents }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Most Common Reason</h6>
+                    <h5 class="mb-0">
+                        {% if reason_stats %}
+                            {{ reason_stats|dictsort:"1"|last|first }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Most Affected Item</h6>
+                    <h6 class="mb-0">
+                        {% if item_stats %}
+                            {{ item_stats|dictsort:"1.count"|last|first }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </h6>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-secondary">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Date Range</h6>
+                    <small class="text-muted">
+                        {% if start_date %}{{ start_date }}{% else %}All time{% endif %}
+                        {% if end_date %} to {{ end_date }}{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filters</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Damage Reason</label>
+                    <select name="damage_reason" class="form-control">
+                        <option value="">All Reasons</option>
+                        {% for code, label in damage_reasons %}
+                            <option value="{{ label }}" {% if selected_reason == label %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i>Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statistics by Reason -->
+    {% if reason_stats %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Damage by Reason</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Reason</th>
+                            <th>Incidents</th>
+                            <th>Percentage</th>
+                            <th width="40%">Distribution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reason, count in reason_stats.items %}
+                        <tr>
+                            <td><strong>{{ reason }}</strong></td>
+                            <td>{{ count }}</td>
+                            <td>{{ count|floatformat:0 }}%</td>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-danger" role="progressbar" 
+                                         style="width: {{ count|floatformat:0 }}%" 
+                                         aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Statistics by Item -->
+    {% if item_stats %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-box me-2"></i>Top 10 Most Affected Items</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Total Quantity Lost</th>
+                            <th>Number of Incidents</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item, stats in item_stats.items %}
+                        <tr>
+                            <td><strong>{{ item }}</strong></td>
+                            <td>{{ stats.qty|floatformat:2 }}</td>
+                            <td><span class="badge bg-danger">{{ stats.count }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Damage Logs -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Recent Damage/Loss Records (Last 100)</h5>
+        </div>
+        <div class="card-body">
+            {% if damages %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Item</th>
+                            <th>Lot</th>
+                            <th>Quantity</th>
+                            <th>Reason</th>
+                            <th>Logged By</th>
+                            <th>Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for damage in damages %}
+                        <tr>
+                            <td>{{ damage.timestamp|date:"M d, Y g:i A" }}</td>
+                            <td>
+                                <a href="{% url 'inventory:item_detail' damage.item.id %}">
+                                    <strong>{{ damage.item.code }}</strong><br>
+                                    <small class="text-muted">{{ damage.item.name }}</small>
+                                </a>
+                            </td>
+                            <td>
+                                {% if damage.lot %}
+                                    {{ damage.lot.lot_no }}
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>{{ damage.qty }} {{ damage.unit }}</strong></td>
+                            <td>
+                                <span class="badge bg-danger">
+                                    {{ damage.reason|truncatewords:3 }}
+                                </span>
+                            </td>
+                            <td>{{ damage.created_by.get_full_name }}</td>
+                            <td>
+                                {% if damage.ref_no %}
+                                    <code>{{ damage.ref_no }}</code>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                No damage/loss records found. {% if start_date or end_date or selected_reason %}Try adjusting your filters.{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

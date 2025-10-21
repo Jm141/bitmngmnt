@@ -45,6 +45,7 @@ urlpatterns = [
     # Stock Operations
     path('stock/receive/', views.stock_receive, name='stock_receive'),
     path('stock/consume/', views.stock_consume, name='stock_consume'),
+    path('stock/damage-log/', views.damage_log, name='damage_log'),
     path('api/item-lots/', views.api_item_lots, name='api_item_lots'),
     path('api/item-meta/', views.api_item_meta, name='api_item_meta'),
     
@@ -63,6 +64,7 @@ urlpatterns = [
     
     # Reports
     path('reports/stock/', views.stock_report, name='stock_report'),
+    path('reports/damage/', views.damage_report, name='damage_report'),
     
     # Expiration Tracker
     path('expiration-tracker/', views.expiration_tracker, name='expiration_tracker'),
