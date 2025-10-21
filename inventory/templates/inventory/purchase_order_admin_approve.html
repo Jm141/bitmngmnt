@@ -1,0 +1,198 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Admin Approve Purchase Order - {{ block.super }}{% endblock %}
+
+{% block page_title %}Admin Approve Purchase Order{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-check-circle me-2"></i>{{ title }}</h2>
+            <p class="text-muted">Review supplier pricing and approve or reject this purchase order</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Order
+            </a>
+        </div>
+    </div>
+
+    <!-- Order Information -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="40%">Order Number:</th>
+                            <td><strong>{{ order.order_no }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th>Supplier:</th>
+                            <td>{{ order.supplier.name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td>
+                                <span class="badge bg-warning text-dark">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Order Date:</th>
+                            <td>{{ order.order_date|date:"M d, Y g:i A" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Expected Delivery:</th>
+                            <td>
+                                {% if order.expected_delivery_date %}
+                                    {{ order.expected_delivery_date|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Supplier Approval Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="40%">Approved By:</th>
+                            <td>
+                                {% if order.supplier_approved_by %}
+                                    {{ order.supplier_approved_by.get_full_name }}
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Approved At:</th>
+                            <td>
+                                {% if order.supplier_approved_at %}
+                                    {{ order.supplier_approved_at|date:"M d, Y g:i A" }}
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Supplier Notes:</th>
+                            <td>
+                                {% if order.supplier_notes %}
+                                    {{ order.supplier_notes }}
+                                {% else %}
+                                    <span class="text-muted">No notes</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Items with Pricing -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Order Items & Pricing</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Item Code</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po_item in order_items %}
+                        <tr>
+                            <td><strong>{{ po_item.item.code }}</strong></td>
+                            <td>{{ po_item.item.name }}</td>
+                            <td>{{ po_item.qty_ordered }}</td>
+                            <td>{{ po_item.unit }}</td>
+                            <td class="text-end">₱{{ po_item.unit_price|floatformat:2 }}</td>
+                            <td class="text-end"><strong>₱{{ po_item.subtotal|floatformat:2 }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-active">
+                            <th colspan="5" class="text-end">Total Amount:</th>
+                            <th class="text-end">
+                                <h5 class="mb-0">₱{{ order.total_amount|floatformat:2 }}</h5>
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Approval Form -->
+    <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-user-shield me-2"></i>Admin Approval Decision</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Review the supplier's pricing above.</strong> If the total amount is acceptable, approve the order. If the price is too high, reject it with a reason.
+            </div>
+
+            <form method="post" id="approveForm">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label for="admin_notes" class="form-label">Admin Notes (Optional)</label>
+                    <textarea name="admin_notes" id="admin_notes" class="form-control" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                    <small class="text-muted">These notes will be visible in the order history.</small>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </a>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'inventory:purchase_order_admin_reject' order.id %}" class="btn btn-danger">
+                            <i class="fas fa-times-circle me-2"></i>Reject Order
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-check-circle me-2"></i>Approve Order
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('approveForm').addEventListener('submit', function(e) {
+    if (!confirm('Are you sure you want to APPROVE this purchase order?\n\nTotal Amount: ₱{{ order.total_amount|floatformat:2 }}\n\nThis will allow the supplier to ship the order.')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

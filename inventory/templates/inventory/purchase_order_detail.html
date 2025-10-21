@@ -32,9 +32,11 @@
                                 {% if order.status == 'draft' %}
                                     <span class="badge bg-secondary">{{ order.get_status_display }}</span>
                                 {% elif order.status == 'pending' %}
-                                    <span class="badge bg-warning">{{ order.get_status_display }}</span>
-                                {% elif order.status == 'approved' %}
+                                    <span class="badge bg-warning text-dark">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'supplier_approved' %}
                                     <span class="badge bg-info">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'admin_approved' %}
+                                    <span class="badge bg-success">{{ order.get_status_display }}</span>
                                 {% elif order.status == 'shipped' %}
                                     <span class="badge bg-primary">{{ order.get_status_display }}</span>
                                 {% elif order.status == 'received' %}
@@ -158,15 +160,54 @@
                     <h5 class="mb-0">Actions</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Pending Status -->
                     {% if order.status == 'pending' %}
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
+                        <div class="alert alert-warning">
+                            <i class="fas fa-clock me-2"></i>
                             <strong>Waiting for Supplier</strong><br>
                             This order is pending supplier approval and pricing.
-                            The supplier will provide pricing and delivery date.
                         </div>
                     {% endif %}
 
+                    <!-- Supplier Approved - Waiting for Admin -->
+                    {% if order.status == 'supplier_approved' %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Supplier Approved</strong><br>
+                            Total: ₱{{ order.total_amount|floatformat:2 }}<br>
+                            Waiting for admin review.
+                        </div>
+                        
+                        {% if user.role == 'admin' or user.role == 'super_admin' %}
+                            <a href="{% url 'inventory:purchase_order_admin_approve' order.id %}" class="btn btn-success w-100 mb-2">
+                                <i class="fas fa-check-circle me-2"></i>Admin Approve
+                            </a>
+                            <a href="{% url 'inventory:purchase_order_admin_reject' order.id %}" class="btn btn-danger w-100 mb-2">
+                                <i class="fas fa-times-circle me-2"></i>Admin Reject
+                            </a>
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- Admin Approved - Ready to Ship -->
+                    {% if order.status == 'admin_approved' %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-double me-2"></i>
+                            <strong>Admin Approved</strong><br>
+                            Total: ₱{{ order.total_amount|floatformat:2 }}<br>
+                            Ready to ship!
+                        </div>
+                    {% endif %}
+
+                    <!-- Shipped Status -->
+                    {% if order.status == 'shipped' %}
+                        <div class="alert alert-primary">
+                            <i class="fas fa-shipping-fast me-2"></i>
+                            <strong>Order Shipped</strong><br>
+                            Waiting for delivery and receipt.
+                        </div>
+                    {% endif %}
+
+                    <!-- Receive Order Button -->
                     {% if order.can_be_received %}
                         <a href="{% url 'inventory:purchase_order_receive' order.id %}" class="btn btn-success w-100 mb-2">
                             <i class="fas fa-box-open me-2"></i>Receive Order
@@ -176,30 +217,37 @@
                         </a>
                     {% endif %}
 
-                    {% if order.status != 'received' and order.status != 'cancelled' %}
-                        <form method="post" action="{% url 'inventory:purchase_order_cancel' order.id %}" class="mb-2" onsubmit="return confirm('Are you sure you want to cancel this purchase order?')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-danger w-100">
-                                <i class="fas fa-times me-2"></i>Cancel Order
-                            </button>
-                        </form>
+                    <!-- Cancel Order Button -->
+                    {% if order.can_be_cancelled %}
+                        <a href="{% url 'inventory:purchase_order_cancel' order.id %}" class="btn btn-danger w-100 mb-2">
+                            <i class="fas fa-ban me-2"></i>Cancel Order
+                        </a>
                     {% endif %}
 
-                    {% if order.status == 'approved' or order.status == 'shipped' %}
-                        <div class="alert alert-success mt-2">
-                            <i class="fas fa-check-circle me-2"></i>
-                            <strong>Supplier Approved</strong><br>
-                            Total: ₱{{ order.total_amount|floatformat:2 }}<br>
-                            Delivery: {{ order.expected_delivery_date|date:"Y-m-d" }}
-                        </div>
-                    {% endif %}
-
+                    <!-- Received Status -->
                     {% if order.status == 'received' %}
                         <div class="alert alert-success">
                             <i class="fas fa-box-open me-2"></i>
                             <strong>Order Completed</strong><br>
                             Received: {{ order.received_at|date:"Y-m-d H:i" }}<br>
                             By: {{ order.received_by.get_full_name }}
+                        </div>
+                    {% endif %}
+
+                    <!-- Cancelled Status -->
+                    {% if order.status == 'cancelled' %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-ban me-2"></i>
+                            <strong>Order Cancelled</strong><br>
+                            {% if order.cancelled_at %}
+                                Cancelled: {{ order.cancelled_at|date:"Y-m-d H:i" }}<br>
+                                By: {{ order.cancelled_by.get_full_name }}<br>
+                            {% endif %}
+                            {% if order.cancellation_reason %}
+                                <hr>
+                                <strong>Reason:</strong><br>
+                                {{ order.cancellation_reason }}
+                            {% endif %}
                         </div>
                     {% endif %}
                 </div>

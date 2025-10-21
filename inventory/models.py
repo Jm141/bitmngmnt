@@ -627,8 +627,9 @@ class PurchaseOrder(models.Model):
     """
     STATUS_CHOICES = [
         ('draft', 'Draft'),
-        ('pending', 'Pending Approval'),
-        ('approved', 'Approved by Supplier'),
+        ('pending', 'Pending Supplier Approval'),
+        ('supplier_approved', 'Approved by Supplier - Pending Admin Review'),
+        ('admin_approved', 'Approved by Admin - Ready to Ship'),
         ('shipped', 'Shipped'),
         ('received', 'Received'),
         ('cancelled', 'Cancelled'),
@@ -637,7 +638,7 @@ class PurchaseOrder(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_no = models.CharField(max_length=100, unique=True, blank=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='purchase_orders')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='draft')
     qr_code = models.CharField(max_length=255, unique=True, blank=True, help_text="Unique QR code for order tracking")
     
     # Order details
@@ -647,7 +648,20 @@ class PurchaseOrder(models.Model):
     
     # Supplier response
     supplier_notes = models.TextField(blank=True, null=True, help_text="Notes from supplier")
-    approved_at = models.DateTimeField(null=True, blank=True)
+    supplier_approved_at = models.DateTimeField(null=True, blank=True)
+    supplier_approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='supplier_approved_orders')
+    
+    # Admin response
+    admin_notes = models.TextField(blank=True, null=True, help_text="Notes from admin")
+    admin_approved_at = models.DateTimeField(null=True, blank=True)
+    admin_approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_approved_orders')
+    
+    # Cancellation tracking
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='cancelled_orders')
+    cancellation_reason = models.TextField(blank=True, null=True, help_text="Reason for cancellation")
+    
+    # Shipping and receiving
     shipped_at = models.DateTimeField(null=True, blank=True)
     received_at = models.DateTimeField(null=True, blank=True)
     
@@ -715,32 +729,75 @@ class PurchaseOrder(models.Model):
         total = sum(item.subtotal() for item in self.order_items.all())
         return total
     
-    def can_be_approved(self):
-        """Check if order can be approved"""
+    def can_supplier_approve(self):
+        """Check if supplier can approve order"""
         return self.status in ['draft', 'pending']
+    
+    def can_admin_approve(self):
+        """Check if admin can approve order"""
+        return self.status == 'supplier_approved'
     
     def can_be_shipped(self):
         """Check if order can be marked as shipped"""
-        return self.status == 'approved'
+        return self.status == 'admin_approved'
     
     def can_be_received(self):
         """Check if order can be received"""
         return self.status == 'shipped'
     
-    def approve_order(self, supplier_notes=None, expected_delivery_date=None):
-        """Approve order (supplier action)"""
-        if not self.can_be_approved():
-            raise ValueError("Order cannot be approved in current status")
+    def can_be_cancelled(self):
+        """Check if order can be cancelled"""
+        return self.status not in ['received', 'cancelled']
+    
+    def supplier_approve_order(self, user, supplier_notes=None, expected_delivery_date=None):
+        """Supplier approves order with pricing"""
+        if not self.can_supplier_approve():
+            raise ValueError("Order cannot be approved by supplier in current status")
         
-        self.status = 'approved'
-        self.approved_at = timezone.now()
+        self.status = 'supplier_approved'
+        self.supplier_approved_at = timezone.now()
+        self.supplier_approved_by = user
         if supplier_notes:
             self.supplier_notes = supplier_notes
         if expected_delivery_date:
             self.expected_delivery_date = expected_delivery_date
         self.save()
     
-    def mark_shipped(self):
+    def admin_approve_order(self, user, admin_notes=None):
+        """Admin approves order after reviewing supplier pricing"""
+        if not self.can_admin_approve():
+            raise ValueError("Order cannot be approved by admin in current status")
+        
+        self.status = 'admin_approved'
+        self.admin_approved_at = timezone.now()
+        self.admin_approved_by = user
+        if admin_notes:
+            self.admin_notes = admin_notes
+        self.save()
+    
+    def admin_reject_order(self, user, reason):
+        """Admin rejects order (price too high, etc.) - sends back to pending"""
+        if self.status != 'supplier_approved':
+            raise ValueError("Only supplier-approved orders can be rejected by admin")
+        
+        self.status = 'pending'
+        self.admin_notes = f"REJECTED: {reason}"
+        self.supplier_approved_at = None
+        self.supplier_approved_by = None
+        self.save()
+    
+    def cancel_order(self, user, reason):
+        """Cancel order with reason"""
+        if not self.can_be_cancelled():
+            raise ValueError(f"Order cannot be cancelled in current status: {self.get_status_display()}")
+        
+        self.status = 'cancelled'
+        self.cancelled_at = timezone.now()
+        self.cancelled_by = user
+        self.cancellation_reason = reason
+        self.save()
+    
+    def mark_shipped(self, user=None):
         """Mark order as shipped"""
         if not self.can_be_shipped():
             raise ValueError("Order cannot be shipped in current status")

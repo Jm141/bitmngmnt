@@ -1,0 +1,171 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Reject Purchase Order - {{ block.super }}{% endblock %}
+
+{% block page_title %}Reject Purchase Order{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-times-circle me-2 text-danger"></i>{{ title }}</h2>
+            <p class="text-muted">Reject this purchase order and provide a reason</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Order
+            </a>
+        </div>
+    </div>
+
+    <!-- Order Summary -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Order Number:</strong> {{ order.order_no }}</p>
+                            <p><strong>Supplier:</strong> {{ order.supplier.name }}</p>
+                            <p><strong>Order Date:</strong> {{ order.order_date|date:"M d, Y" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> 
+                                <span class="badge bg-warning text-dark">{{ order.get_status_display }}</span>
+                            </p>
+                            <p><strong>Total Amount:</strong> 
+                                <span class="text-danger fs-4">₱{{ order.total_amount|floatformat:2 }}</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="fas fa-exclamation-triangle me-2"></i>Warning</h6>
+                    <p class="card-text mb-0">
+                        Rejecting this order will send it back to <strong>"Pending"</strong> status. 
+                        The supplier will need to re-submit with new pricing.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Items -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Order Items</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Quantity</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po_item in order_items %}
+                        <tr>
+                            <td>{{ po_item.item.name }} ({{ po_item.item.code }})</td>
+                            <td>{{ po_item.qty_ordered }} {{ po_item.unit }}</td>
+                            <td class="text-end">₱{{ po_item.unit_price|floatformat:2 }}</td>
+                            <td class="text-end">₱{{ po_item.subtotal|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rejection Form -->
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-ban me-2"></i>Rejection Reason</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <strong>Required:</strong> You must provide a clear reason for rejecting this order. This will help the supplier understand why the order was rejected.
+            </div>
+
+            <form method="post" id="rejectForm">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label for="reason" class="form-label">
+                        Rejection Reason <span class="text-danger">*</span>
+                    </label>
+                    <textarea name="reason" id="reason" class="form-control" rows="5" required 
+                              placeholder="Example: Price exceeds budget by 30%. Please revise pricing to be within ₱XX,XXX range."></textarea>
+                    <small class="text-muted">
+                        Be specific about why the order is being rejected (e.g., price too high, budget constraints, found better supplier, etc.)
+                    </small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Common Rejection Reasons (Click to use):</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Price exceeds approved budget')">
+                            Price exceeds budget
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Price is 20%+ higher than market rate')">
+                            Price too high
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Found better pricing from alternative supplier')">
+                            Better alternative found
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Delivery date does not meet requirements')">
+                            Delivery date issue
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                    
+                    <button type="submit" class="btn btn-danger btn-lg">
+                        <i class="fas fa-times-circle me-2"></i>Reject Purchase Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function setReason(text) {
+    document.getElementById('reason').value = text;
+}
+
+document.getElementById('rejectForm').addEventListener('submit', function(e) {
+    const reason = document.getElementById('reason').value.trim();
+    
+    if (!reason) {
+        e.preventDefault();
+        alert('Please provide a reason for rejection.');
+        return false;
+    }
+    
+    if (!confirm('Are you sure you want to REJECT this purchase order?\n\nOrder: {{ order.order_no }}\nTotal: ₱{{ order.total_amount|floatformat:2 }}\n\nThe order will be sent back to Pending status.')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

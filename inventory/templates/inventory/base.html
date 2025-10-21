@@ -330,6 +330,95 @@
             gap: 0.25rem;
         }
         
+        .nav-group {
+            margin-bottom: 0.5rem;
+        }
+        
+        .nav-parent {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: none;
+            border-radius: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-parent:hover {
+            background: var(--muted);
+        }
+        
+        .nav-parent-content {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+        }
+        
+        .nav-parent-toggle {
+            transition: transform 0.2s ease;
+            font-size: 0.75rem;
+        }
+        
+        .nav-parent.expanded .nav-parent-toggle {
+            transform: rotate(90deg);
+        }
+        
+        .nav-children {
+            display: none;
+            padding-left: 1rem;
+            margin-top: 0.25rem;
+        }
+        
+        .nav-children.show {
+            display: block;
+        }
+        
+        .nav-child {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 1rem;
+            margin-bottom: 0.125rem;
+            border-radius: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-child:hover {
+            background: var(--muted);
+            color: var(--text);
+        }
+        
+        .nav-child.active {
+            background: #c9a27b;
+            color: white;
+        }
+        
+        .nav-child-icon {
+            width: 1rem;
+            height: 1rem;
+            opacity: 0.7;
+        }
+        
+        .sidebar.collapsed .nav-children {
+            display: none !important;
+        }
+        
+        .sidebar.collapsed .nav-parent-toggle {
+            display: none;
+        }
+        
         .nav-item {
             display: block;
             width: 100%;
@@ -1206,64 +1295,136 @@
                         </a>
                     
                     {% else %}
-                        {# ADMIN/SUPER_ADMIN NAVIGATION - Full features #}
+                        {# ADMIN/SUPER_ADMIN NAVIGATION - Tree Structure #}
                         <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'inventory:dashboard' %}">
                             <i class="fas fa-house nav-icon"></i>
                             <span>Dashboard</span>
                         </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/" onclick="console.log('Inventory link clicked:', this.href);">
-                            <i class="fas fa-box nav-icon"></i>
-                            <span>Inventory</span>
-                        </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' or request.resolver_match.url_name == 'item_create' or request.resolver_match.url_name == 'item_update' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
-                            <i class="fas fa-bag-shopping nav-icon"></i>
-                            <span>Items</span>
-                        </a>
-                        <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
-                            <i class="fas fa-shopping-cart nav-icon"></i>
-                            <span>Purchase Orders</span>
-                        </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'production_list' or request.resolver_match.url_name == 'production_create' %}active{% endif %}" href="{% url 'inventory:production_list' %}">
-                            <i class="fas fa-industry nav-icon"></i>
-                            <span>Production</span>
-                        </a>
+                        
+                        <!-- Inventory Management Group -->
+                        <div class="nav-group">
+                            <button class="nav-parent" data-target="inventory-menu">
+                                <div class="nav-parent-content">
+                                    <i class="fas fa-box nav-icon"></i>
+                                    <span>Inventory</span>
+                                </div>
+                                <i class="fas fa-chevron-right nav-parent-toggle"></i>
+                            </button>
+                            <div class="nav-children" id="inventory-menu">
+                                <a class="nav-child {% if request.resolver_match.url_name == 'inventory_dashboard' %}active{% endif %}" href="/inventory/">
+                                    <i class="fas fa-chart-line nav-child-icon"></i>
+                                    <span>Overview</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_detail' or request.resolver_match.url_name == 'item_create' or request.resolver_match.url_name == 'item_update' %}active{% endif %}" href="{% url 'inventory:item_list' %}">
+                                    <i class="fas fa-bag-shopping nav-child-icon"></i>
+                                    <span>Items</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'stock_receive' %}active{% endif %}" href="{% url 'inventory:stock_receive' %}">
+                                    <i class="fas fa-arrow-down nav-child-icon"></i>
+                                    <span>Receive Stock</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'stock_consume' %}active{% endif %}" href="{% url 'inventory:stock_consume' %}">
+                                    <i class="fas fa-arrow-up nav-child-icon"></i>
+                                    <span>Consume Stock</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
+                                    <i class="fas fa-calendar-times nav-child-icon"></i>
+                                    <span>Expiration Tracker</span>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Purchase Orders Group -->
+                        <div class="nav-group">
+                            <button class="nav-parent" data-target="purchase-menu">
+                                <div class="nav-parent-content">
+                                    <i class="fas fa-shopping-cart nav-icon"></i>
+                                    <span>Purchase Orders</span>
+                                </div>
+                                <i class="fas fa-chevron-right nav-parent-toggle"></i>
+                            </button>
+                            <div class="nav-children" id="purchase-menu">
+                                <a class="nav-child {% if request.resolver_match.url_name == 'purchase_order_list' %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
+                                    <i class="fas fa-list nav-child-icon"></i>
+                                    <span>All Orders</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'purchase_order_create' %}active{% endif %}" href="{% url 'inventory:purchase_order_create' %}">
+                                    <i class="fas fa-plus nav-child-icon"></i>
+                                    <span>Create Order</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'purchase_order_scan_receive' %}active{% endif %}" href="{% url 'inventory:purchase_order_scan_receive' %}">
+                                    <i class="fas fa-qrcode nav-child-icon"></i>
+                                    <span>Scan & Receive</span>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Production Group -->
+                        <div class="nav-group">
+                            <button class="nav-parent" data-target="production-menu">
+                                <div class="nav-parent-content">
+                                    <i class="fas fa-industry nav-icon"></i>
+                                    <span>Production</span>
+                                </div>
+                                <i class="fas fa-chevron-right nav-parent-toggle"></i>
+                            </button>
+                            <div class="nav-children" id="production-menu">
+                                <a class="nav-child {% if request.resolver_match.url_name == 'production_list' %}active{% endif %}" href="{% url 'inventory:production_list' %}">
+                                    <i class="fas fa-list nav-child-icon"></i>
+                                    <span>Production List</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'production_create' %}active{% endif %}" href="{% url 'inventory:production_create' %}">
+                                    <i class="fas fa-plus nav-child-icon"></i>
+                                    <span>New Production</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' or request.resolver_match.url_name == 'recipe_create' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
+                                    <i class="fas fa-book nav-child-icon"></i>
+                                    <span>Recipes</span>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Suppliers -->
                         <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
                             <i class="fas fa-truck nav-icon"></i>
                             <span>Suppliers</span>
                         </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' or request.resolver_match.url_name == 'recipe_create' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
-                            <i class="fas fa-book nav-icon"></i>
-                            <span>Recipes</span>
-                        </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
-                            <i class="fas fa-calendar-times nav-icon"></i>
-                            <span>Expiration Tracker</span>
-                        </a>
+                        
+                        <!-- Reports -->
                         <a class="nav-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}" href="{% url 'inventory:stock_report' %}">
                             <i class="fas fa-chart-bar nav-icon"></i>
                             <span>Reports</span>
                         </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'inventory:user_list' %}">
-                            <i class="fas fa-users nav-icon"></i>
-                            <span>Team</span>
-                        </a>
-                        <a class="nav-item {% if request.resolver_match.url_name == 'admin_attendance_overview' %}active{% endif %}" href="{% url 'inventory:admin_attendance_overview' %}">
-                            <i class="fas fa-calendar-check nav-icon"></i>
-                            <span>Attendance Overview</span>
-                        </a>
+                        
+                        <!-- Team Management Group -->
+                        <div class="nav-group">
+                            <button class="nav-parent" data-target="team-menu">
+                                <div class="nav-parent-content">
+                                    <i class="fas fa-users nav-icon"></i>
+                                    <span>Team</span>
+                                </div>
+                                <i class="fas fa-chevron-right nav-parent-toggle"></i>
+                            </button>
+                            <div class="nav-children" id="team-menu">
+                                <a class="nav-child {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'inventory:user_list' %}">
+                                    <i class="fas fa-user-friends nav-child-icon"></i>
+                                    <span>All Users</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'user_create' %}active{% endif %}" href="{% url 'inventory:user_create' %}">
+                                    <i class="fas fa-user-plus nav-child-icon"></i>
+                                    <span>Add User</span>
+                                </a>
+                                <a class="nav-child {% if request.resolver_match.url_name == 'admin_attendance_overview' %}active{% endif %}" href="{% url 'inventory:admin_attendance_overview' %}">
+                                    <i class="fas fa-calendar-check nav-child-icon"></i>
+                                    <span>Attendance</span>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Activity Logs -->
                         <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
                             <i class="fas fa-history nav-icon"></i>
                             <span>Activity Logs</span>
-                        </a>
-                        {% if user.role == 'super_admin' %}
-                        <a class="nav-item {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'inventory:audit_logs' %}">
-                            <i class="fas fa-clipboard-list nav-icon"></i>
-                            <span>Audit Logs</span>
-                        </a>
-                        {% endif %}
-                        <a class="nav-item" href="#">
-                            <i class="fas fa-gear nav-icon"></i>
-                            <span>Settings</span>
                         </a>
                     {% endif %}
                 {% endif %}
@@ -1423,14 +1584,63 @@
                 });
             }
 
+            // Tree Navigation Toggle
+            const navParents = document.querySelectorAll('.nav-parent');
+            navParents.forEach(function(parent) {
+                parent.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('data-target');
+                    const targetMenu = document.getElementById(targetId);
+                    
+                    if (targetMenu) {
+                        // Toggle this menu
+                        const isExpanded = targetMenu.classList.contains('show');
+                        targetMenu.classList.toggle('show');
+                        this.classList.toggle('expanded');
+                        
+                        // Save state to localStorage
+                        const menuState = JSON.parse(localStorage.getItem('navMenuState') || '{}');
+                        menuState[targetId] = !isExpanded;
+                        localStorage.setItem('navMenuState', JSON.stringify(menuState));
+                    }
+                });
+            });
+            
+            // Restore menu states from localStorage
+            const savedMenuState = JSON.parse(localStorage.getItem('navMenuState') || '{}');
+            Object.keys(savedMenuState).forEach(function(menuId) {
+                if (savedMenuState[menuId]) {
+                    const menu = document.getElementById(menuId);
+                    const parent = document.querySelector(`[data-target="${menuId}"]`);
+                    if (menu && parent) {
+                        menu.classList.add('show');
+                        parent.classList.add('expanded');
+                    }
+                }
+            });
+            
+            // Auto-expand menu if child is active
+            const activeChildren = document.querySelectorAll('.nav-child.active');
+            activeChildren.forEach(function(child) {
+                const parentMenu = child.closest('.nav-children');
+                if (parentMenu) {
+                    const menuId = parentMenu.id;
+                    const parent = document.querySelector(`[data-target="${menuId}"]`);
+                    if (parent) {
+                        parentMenu.classList.add('show');
+                        parent.classList.add('expanded');
+                    }
+                }
+            });
+
             // Debug navigation clicks
-            const navItems = document.querySelectorAll('.nav-item');
+            const navItems = document.querySelectorAll('.nav-item, .nav-child');
             navItems.forEach(function(navItem) {
                 navItem.addEventListener('click', function(e) {
                     console.log('Navigation clicked:', this.href, this.textContent.trim());
                     
                     // Special handling for inventory dashboard
-                    if (this.href.includes('inventory_dashboard')) {
+                    if (this.href && this.href.includes('inventory_dashboard')) {
                         console.log('Inventory dashboard link clicked!');
                         // Ensure the link works properly
                         if (this.href.endsWith('#')) {
@@ -1441,14 +1651,14 @@
                 });
             });
 
-        // Auto-hide alerts after 5 seconds
-        setTimeout(function() {
+            // Auto-hide alerts after 5 seconds
+            setTimeout(function() {
                 const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
+                alerts.forEach(function(alert) {
                     const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            });
-        }, 5000);
+                    bsAlert.close();
+                });
+            }, 5000);
         });
     </script>
     {% block extra_js %}

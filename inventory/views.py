@@ -289,14 +289,33 @@ def attendance_dashboard(request):
             else:
                 date = datetime(year, month, day).date()
                 record = records_dict.get(date)
+                
+                # Determine attendance status
+                is_complete = False
+                is_partial = False
+                is_ongoing = False
+                
+                if record:
+                    am_complete = record.is_am_complete()
+                    pm_complete = record.is_pm_complete()
+                    
+                    # Check if ongoing (clocked in but not out)
+                    am_ongoing = record.time_in_am and not record.time_out_am
+                    pm_ongoing = record.time_in_pm and not record.time_out_pm
+                    
+                    is_complete = am_complete and pm_complete
+                    is_partial = (am_complete or pm_complete) and not is_complete and not (am_ongoing or pm_ongoing)
+                    is_ongoing = am_ongoing or pm_ongoing
+                
                 week_data.append({
                     'day': day,
                     'date': date,
                     'is_today': date == today,
                     'record': record,
                     'has_record': record is not None,
-                    'is_complete': record.is_am_complete() and record.is_pm_complete() if record else False,
-                    'is_partial': (record.is_am_complete() or record.is_pm_complete()) and not (record.is_am_complete() and record.is_pm_complete()) if record else False,
+                    'is_complete': is_complete,
+                    'is_partial': is_partial,
+                    'is_ongoing': is_ongoing,
                 })
         calendar_weeks.append(week_data)
     
@@ -2224,9 +2243,23 @@ def purchase_order_create(request):
     # Get all active items for selection
     items = Item.objects.filter(is_active=True).order_by('name')
     
+    # Get low stock items with current stock levels
+    low_stock_items = []
+    for item in items:
+        current_stock = item.get_current_stock()
+        if current_stock <= item.reorder_level:
+            low_stock_items.append({
+                'item': item,
+                'current_stock': current_stock,
+                'reorder_level': item.reorder_level,
+                'min_order_qty': item.min_order_qty,
+                'is_out_of_stock': current_stock == 0
+            })
+    
     context = {
         'form': form,
         'items': items,
+        'low_stock_items': low_stock_items,
         'title': 'Create Purchase Order',
     }
     
@@ -2237,11 +2270,11 @@ def purchase_order_create(request):
 @permission_required('inventory_write')
 def purchase_order_approve(request, order_id):
     """
-    Approve purchase order with pricing (staff simulating supplier action)
+    Supplier approves purchase order with pricing
     """
     order = get_object_or_404(PurchaseOrder, id=order_id)
     
-    if not order.can_be_approved():
+    if not order.can_supplier_approve():
         messages.error(request, f"Purchase order cannot be approved. Current status: {order.get_status_display()}")
         return redirect('inventory:purchase_order_detail', order_id=order_id)
     
@@ -2263,9 +2296,10 @@ def purchase_order_approve(request, order_id):
                 order.total_amount = order.calculate_total()
                 order.save()
                 
-                # Approve order
-                PurchaseOrderService.approve_purchase_order(
+                # Supplier approves order
+                PurchaseOrderService.supplier_approve_purchase_order(
                     po=order,
+                    user=request.user,
                     supplier_notes=form.cleaned_data.get('supplier_notes'),
                     expected_delivery_date=form.cleaned_data['expected_delivery_date']
                 )
@@ -2275,11 +2309,11 @@ def purchase_order_approve(request, order_id):
                     action_type='update',
                     target_model='PurchaseOrder',
                     target_id=order_id,
-                    description=f"Approved purchase order {order.order_no} with pricing",
+                    description=f"Supplier approved purchase order {order.order_no} with pricing",
                     request=request
                 )
                 
-                messages.success(request, f"Purchase order {order.order_no} approved successfully with pricing.")
+                messages.success(request, f"Purchase order {order.order_no} approved by supplier. Waiting for admin approval.")
                 return redirect('inventory:purchase_order_detail', order_id=order_id)
             except Exception as e:
                 messages.error(request, f"Error approving purchase order: {str(e)}")
@@ -2293,10 +2327,102 @@ def purchase_order_approve(request, order_id):
         'form': form,
         'order': order,
         'order_items': order_items,
-        'title': f'Approve Purchase Order: {order.order_no}',
+        'title': f'Supplier Approve Purchase Order: {order.order_no}',
     }
     
     return render(request, 'inventory/purchase_order_approve.html', context)
+
+
+@login_required
+@admin_required
+def purchase_order_admin_approve(request, order_id):
+    """
+    Admin approves purchase order after reviewing supplier pricing
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    if not order.can_admin_approve():
+        messages.error(request, f"Purchase order cannot be approved by admin. Current status: {order.get_status_display()}")
+        return redirect('inventory:purchase_order_detail', order_id=order_id)
+    
+    if request.method == 'POST':
+        admin_notes = request.POST.get('admin_notes', '')
+        try:
+            PurchaseOrderService.admin_approve_purchase_order(
+                po=order,
+                user=request.user,
+                admin_notes=admin_notes
+            )
+            
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='PurchaseOrder',
+                target_id=order_id,
+                description=f"Admin approved purchase order {order.order_no}",
+                request=request
+            )
+            
+            messages.success(request, f"Purchase order {order.order_no} approved by admin. Ready to ship.")
+            return redirect('inventory:purchase_order_detail', order_id=order_id)
+        except Exception as e:
+            messages.error(request, f"Error approving purchase order: {str(e)}")
+    
+    context = {
+        'order': order,
+        'order_items': order.order_items.all(),
+        'title': f'Admin Approve Purchase Order: {order.order_no}',
+    }
+    
+    return render(request, 'inventory/purchase_order_admin_approve.html', context)
+
+
+@login_required
+@admin_required
+def purchase_order_admin_reject(request, order_id):
+    """
+    Admin rejects purchase order (price too high, etc.)
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+    
+    if order.status != 'supplier_approved':
+        messages.error(request, f"Only supplier-approved orders can be rejected. Current status: {order.get_status_display()}")
+        return redirect('inventory:purchase_order_detail', order_id=order_id)
+    
+    if request.method == 'POST':
+        reason = request.POST.get('reason', '')
+        if not reason:
+            messages.error(request, "Please provide a reason for rejection.")
+            return redirect('inventory:purchase_order_detail', order_id=order_id)
+        
+        try:
+            PurchaseOrderService.admin_reject_purchase_order(
+                po=order,
+                user=request.user,
+                reason=reason
+            )
+            
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='PurchaseOrder',
+                target_id=order_id,
+                description=f"Admin rejected purchase order {order.order_no}: {reason}",
+                request=request
+            )
+            
+            messages.warning(request, f"Purchase order {order.order_no} rejected. Reason: {reason}")
+            return redirect('inventory:purchase_order_detail', order_id=order_id)
+        except Exception as e:
+            messages.error(request, f"Error rejecting purchase order: {str(e)}")
+    
+    context = {
+        'order': order,
+        'order_items': order.order_items.all(),
+        'title': f'Reject Purchase Order: {order.order_no}',
+    }
+    
+    return render(request, 'inventory/purchase_order_admin_reject.html', context)
 
 
 @login_required
@@ -2383,31 +2509,47 @@ def purchase_order_scan_receive(request):
 @permission_required('inventory_write')
 def purchase_order_cancel(request, order_id):
     """
-    Cancel purchase order
+    Cancel purchase order with reason
     """
     order = get_object_or_404(PurchaseOrder, id=order_id)
     
-    if order.status == 'received':
-        messages.error(request, "Cannot cancel a received purchase order.")
+    if not order.can_be_cancelled():
+        messages.error(request, f"Cannot cancel purchase order. Current status: {order.get_status_display()}")
         return redirect('inventory:purchase_order_detail', order_id=order_id)
     
     if request.method == 'POST':
-        order.status = 'cancelled'
-        order.save()
+        reason = request.POST.get('reason', '')
+        if not reason:
+            messages.error(request, "Please provide a reason for cancellation.")
+            return redirect('inventory:purchase_order_detail', order_id=order_id)
         
-        log_user_action(
-            user=request.user,
-            action_type='update',
-            target_model='PurchaseOrder',
-            target_id=order_id,
-            description=f"Cancelled purchase order {order.order_no}",
-            request=request
-        )
-        
-        messages.success(request, f"Purchase order {order.order_no} cancelled.")
-        return redirect('inventory:purchase_order_list')
+        try:
+            PurchaseOrderService.cancel_purchase_order(
+                po=order,
+                user=request.user,
+                reason=reason
+            )
+            
+            log_user_action(
+                user=request.user,
+                action_type='update',
+                target_model='PurchaseOrder',
+                target_id=order_id,
+                description=f"Cancelled purchase order {order.order_no}: {reason}",
+                request=request
+            )
+            
+            messages.success(request, f"Purchase order {order.order_no} cancelled. Reason: {reason}")
+            return redirect('inventory:purchase_order_list')
+        except Exception as e:
+            messages.error(request, f"Error cancelling purchase order: {str(e)}")
     
-    return redirect('inventory:purchase_order_detail', order_id=order_id)
+    context = {
+        'order': order,
+        'title': f'Cancel Purchase Order: {order.order_no}',
+    }
+    
+    return render(request, 'inventory/purchase_order_cancel.html', context)
 
 
 # --- SUPPLIER PORTAL VIEWS ---

@@ -275,12 +275,15 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Order Information', {'fields': ('order_no', 'supplier', 'status', 'qr_code')}),
         ('Dates', {'fields': ('order_date', 'expected_delivery_date', 'actual_delivery_date')}),
-        ('Supplier Response', {'fields': ('supplier_notes', 'approved_at', 'shipped_at', 'received_at')}),
-        ('Internal', {'fields': ('notes', 'total_amount', 'received_by')}),
+        ('Supplier Response', {'fields': ('supplier_notes', 'supplier_approved_at', 'supplier_approved_by')}),
+        ('Admin Response', {'fields': ('admin_notes', 'admin_approved_at', 'admin_approved_by')}),
+        ('Cancellation', {'fields': ('cancelled_at', 'cancelled_by', 'cancellation_reason')}),
+        ('Shipping & Receiving', {'fields': ('shipped_at', 'received_at', 'received_by')}),
+        ('Internal', {'fields': ('notes', 'total_amount')}),
         ('Metadata', {'fields': ('created_at', 'updated_at', 'created_by')}),
     )
     
-    readonly_fields = ('order_no', 'qr_code', 'order_date', 'approved_at', 'shipped_at', 'received_at', 'created_at', 'updated_at')
+    readonly_fields = ('order_no', 'qr_code', 'order_date', 'supplier_approved_at', 'supplier_approved_by', 'admin_approved_at', 'admin_approved_by', 'cancelled_at', 'cancelled_by', 'shipped_at', 'received_at', 'created_at', 'updated_at')
     
     def save_model(self, request, obj, form, change):
         if not change:  # Creating new purchase order

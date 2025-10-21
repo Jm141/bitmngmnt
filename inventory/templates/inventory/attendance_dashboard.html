@@ -181,7 +181,7 @@
                         {% if day_data.day == 0 %}
                             <div class="calendar-day empty"></div>
                         {% else %}
-                            <div class="calendar-day {% if day_data.is_today %}today{% endif %} {% if day_data.is_complete %}complete{% elif day_data.is_partial %}partial{% elif day_data.has_record %}absent{% endif %}" 
+                            <div class="calendar-day {% if day_data.is_today %}today{% endif %} {% if day_data.is_complete %}complete{% elif day_data.is_ongoing %}ongoing{% elif day_data.is_partial %}partial{% elif day_data.has_record %}absent{% endif %}" 
                                  data-date="{{ day_data.date|date:'Y-m-d' }}"
                                  onclick="showAttendanceDetail('{{ day_data.date|date:'Y-m-d' }}', {{ day_data.has_record|yesno:'true,false' }})">
                                 <div class="calendar-day-number">{{ day_data.day }}</div>
@@ -189,6 +189,8 @@
                                     <div class="calendar-day-indicator">
                                         {% if day_data.is_complete %}
                                             <i class="fas fa-check-circle text-green-600"></i>
+                                        {% elif day_data.is_ongoing %}
+                                            <i class="fas fa-clock text-blue-600"></i>
                                         {% elif day_data.is_partial %}
                                             <i class="fas fa-exclamation-circle text-yellow-600"></i>
                                         {% else %}
@@ -203,10 +205,14 @@
             </div>
             
             <!-- Legend -->
-            <div class="mt-4 flex items-center gap-4 text-sm">
+            <div class="mt-4 flex items-center gap-4 text-sm flex-wrap">
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-4 rounded bg-green-100 border-2 border-green-600"></div>
                     <span>Complete</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-blue-100 border-2 border-blue-600"></div>
+                    <span>Ongoing</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-4 rounded bg-yellow-100 border-2 border-yellow-600"></div>
@@ -281,6 +287,21 @@
     .calendar-day.complete {
         background: #f0fdf4;
         border-color: #16a34a;
+    }
+    
+    .calendar-day.ongoing {
+        background: #dbeafe;
+        border-color: #2563eb;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
     }
     
     .calendar-day.partial {
@@ -409,6 +430,21 @@
     .calendar-day.complete {
         background: #f0fdf4;
         border-color: #16a34a;
+    }
+    
+    .calendar-day.ongoing {
+        background: #dbeafe;
+        border-color: #2563eb;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
     }
     
     .calendar-day.partial {

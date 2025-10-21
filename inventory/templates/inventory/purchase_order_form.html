@@ -34,6 +34,85 @@
         {% csrf_token %}
         
         <div class="row">
+            <!-- Low Stock Items Section -->
+            {% if low_stock_items %}
+            <div class="col-12 mb-4">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Low Stock Items
+                            <span class="badge bg-dark ms-2">{{ low_stock_items|length }} items</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Select items below to quickly add them to your purchase order. Suggested quantities are based on minimum order quantities.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm">
+                                <thead>
+                                    <tr>
+                                        <th width="50"><input type="checkbox" id="selectAllLowStock" class="form-check-input"></th>
+                                        <th>Item Code</th>
+                                        <th>Item Name</th>
+                                        <th>Current Stock</th>
+                                        <th>Reorder Level</th>
+                                        <th>Suggested Qty</th>
+                                        <th>Unit</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item_data in low_stock_items %}
+                                    <tr class="low-stock-row {% if item_data.is_out_of_stock %}table-danger{% else %}table-warning{% endif %}">
+                                        <td>
+                                            <input type="checkbox" 
+                                                   class="form-check-input low-stock-checkbox" 
+                                                   data-item-id="{{ item_data.item.id }}"
+                                                   data-item-name="{{ item_data.item.name|escapejs }}"
+                                                   data-item-code="{{ item_data.item.code }}"
+                                                   data-item-unit="{{ item_data.item.unit }}"
+                                                   data-suggested-qty="{{ item_data.min_order_qty }}">
+                                        </td>
+                                        <td><strong>{{ item_data.item.code }}</strong></td>
+                                        <td>{{ item_data.item.name }}</td>
+                                        <td>
+                                            <span class="badge {% if item_data.is_out_of_stock %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                                {{ item_data.current_stock }} {{ item_data.item.unit }}
+                                            </span>
+                                        </td>
+                                        <td>{{ item_data.reorder_level }} {{ item_data.item.unit }}</td>
+                                        <td><strong>{{ item_data.min_order_qty }} {{ item_data.item.unit }}</strong></td>
+                                        <td>{{ item_data.item.unit }}</td>
+                                        <td>
+                                            {% if item_data.is_out_of_stock %}
+                                                <span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i>Out of Stock</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i>Low Stock</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-primary" onclick="addSelectedLowStockItems()">
+                                <i class="fas fa-plus-circle me-2"></i>Add Selected Items to Order
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="selectAllLowStockItems()">
+                                <i class="fas fa-check-square me-2"></i>Select All
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearLowStockSelection()">
+                                <i class="fas fa-times me-2"></i>Clear Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Order Information -->
             <div class="col-md-6">
                 <div class="card mb-4">
@@ -76,9 +155,9 @@
                         </button>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-warning mb-3">
+                        <div class="alert alert-info mb-3">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Note:</strong> You only need to specify items and quantities. The supplier will provide pricing and delivery date when they approve the order.
+                            <strong>Tip:</strong> Select items from the Low Stock Items section above, or manually add items below. The supplier will provide pricing during approval.
                         </div>
                         <div id="orderItemsContainer">
                             <!-- Order items will be added here dynamically -->
@@ -218,9 +297,117 @@ function updateTotal() {
     document.getElementById('totalItems').textContent = totalItems;
 }
 
-// Add first item on page load
+// Low Stock Items Functions
+function selectAllLowStockItems() {
+    document.querySelectorAll('.low-stock-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function clearLowStockSelection() {
+    document.querySelectorAll('.low-stock-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+function addSelectedLowStockItems() {
+    const selectedCheckboxes = document.querySelectorAll('.low-stock-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one item to add.');
+        return;
+    }
+    
+    selectedCheckboxes.forEach(checkbox => {
+        const itemId = checkbox.dataset.itemId;
+        const itemName = checkbox.dataset.itemName;
+        const itemCode = checkbox.dataset.itemCode;
+        const itemUnit = checkbox.dataset.itemUnit;
+        const suggestedQty = checkbox.dataset.suggestedQty;
+        
+        // Check if item already exists in order
+        const existingItems = document.querySelectorAll('.item-select');
+        let itemExists = false;
+        existingItems.forEach(select => {
+            if (select.value === itemId) {
+                itemExists = true;
+            }
+        });
+        
+        if (!itemExists) {
+            addOrderItemWithData(itemId, itemName, itemCode, itemUnit, suggestedQty);
+        }
+    });
+    
+    // Clear selection after adding
+    clearLowStockSelection();
+    
+    // Show success message
+    const addedCount = selectedCheckboxes.length;
+    alert(`${addedCount} item(s) added to order successfully!`);
+}
+
+function addOrderItemWithData(itemId, itemName, itemCode, itemUnit, suggestedQty) {
+    const container = document.getElementById('orderItemsContainer');
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'order-item-row card mb-3 border-success';
+    itemDiv.id = `orderItem_${itemCounter}`;
+    
+    itemDiv.innerHTML = `
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-5">
+                    <label class="form-label">Item</label>
+                    <select name="item_${itemCounter}" class="form-select item-select" onchange="updateTotal()" required>
+                        <option value="">Select Item</option>
+                        ${itemsData.map(item => `<option value="${item.id}" ${item.id === itemId ? 'selected' : ''}>${item.name} (${item.code})</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Quantity Needed</label>
+                    <input type="number" name="qty_${itemCounter}" class="form-control qty-input" step="0.01" min="0.01" value="${suggestedQty}" onchange="updateTotal()" required>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-danger w-100" onclick="removeOrderItem(${itemCounter})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <label class="form-label">Notes (Optional)</label>
+                    <input type="text" name="item_notes_${itemCounter}" class="form-control" placeholder="Additional notes for this item">
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(itemDiv);
+    
+    // Initialize Select2 on the newly added select element
+    $(`#orderItem_${itemCounter} .item-select`).select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search for an item...',
+        allowClear: true,
+        width: '100%'
+    });
+    
+    itemCounter++;
+    document.getElementById('itemCount').value = itemCounter;
+    document.getElementById('noItemsAlert').style.display = 'none';
+    updateTotal();
+}
+
+// Select All checkbox handler
 document.addEventListener('DOMContentLoaded', function() {
-    addOrderItem();
+    const selectAllCheckbox = document.getElementById('selectAllLowStock');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            document.querySelectorAll('.low-stock-checkbox').forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
 });
 
 // Form validation

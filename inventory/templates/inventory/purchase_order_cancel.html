@@ -1,0 +1,222 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Cancel Purchase Order - {{ block.super }}{% endblock %}
+
+{% block page_title %}Cancel Purchase Order{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-ban me-2 text-danger"></i>{{ title }}</h2>
+            <p class="text-muted">Cancel this purchase order permanently</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Order
+            </a>
+        </div>
+    </div>
+
+    <!-- Order Summary -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Order to Cancel</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">Order Number:</th>
+                                    <td><strong>{{ order.order_no }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Supplier:</th>
+                                    <td>{{ order.supplier.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Order Date:</th>
+                                    <td>{{ order.order_date|date:"M d, Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created By:</th>
+                                    <td>{{ order.created_by.get_full_name }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">Status:</th>
+                                    <td>
+                                        <span class="badge 
+                                            {% if order.status == 'pending' %}bg-warning text-dark
+                                            {% elif order.status == 'supplier_approved' %}bg-info
+                                            {% elif order.status == 'admin_approved' %}bg-success
+                                            {% elif order.status == 'shipped' %}bg-primary
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Total Amount:</th>
+                                    <td><strong class="fs-5">₱{{ order.total_amount|floatformat:2 }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Items Count:</th>
+                                    <td>{{ order.order_items.count }} items</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="fas fa-exclamation-triangle me-2"></i>Warning</h6>
+                    <p class="card-text mb-2">
+                        <strong>This action cannot be undone!</strong>
+                    </p>
+                    <p class="card-text mb-0 small">
+                        Cancelling this order will permanently mark it as cancelled. 
+                        The order cannot be processed or received after cancellation.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Items -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Order Items</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Item Code</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po_item in order.order_items.all %}
+                        <tr>
+                            <td><strong>{{ po_item.item.code }}</strong></td>
+                            <td>{{ po_item.item.name }}</td>
+                            <td>{{ po_item.qty_ordered }}</td>
+                            <td>{{ po_item.unit }}</td>
+                            <td class="text-end">₱{{ po_item.unit_price|floatformat:2 }}</td>
+                            <td class="text-end">₱{{ po_item.subtotal|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-active">
+                            <th colspan="5" class="text-end">Total:</th>
+                            <th class="text-end">₱{{ order.total_amount|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancellation Form -->
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-ban me-2"></i>Cancellation Reason</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <strong>Required:</strong> You must provide a reason for cancelling this order. This will be recorded in the order history.
+            </div>
+
+            <form method="post" id="cancelForm">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label for="reason" class="form-label">
+                        Cancellation Reason <span class="text-danger">*</span>
+                    </label>
+                    <textarea name="reason" id="reason" class="form-control" rows="5" required 
+                              placeholder="Example: Order no longer needed due to change in production schedule."></textarea>
+                    <small class="text-muted">
+                        Provide a clear explanation for why this order is being cancelled.
+                    </small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Common Cancellation Reasons (Click to use):</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Order no longer needed')">
+                            No longer needed
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Items out of stock at supplier')">
+                            Out of stock
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Budget constraints - order cancelled')">
+                            Budget constraints
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Duplicate order created by mistake')">
+                            Duplicate order
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Supplier cannot meet delivery requirements')">
+                            Delivery issue
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setReason('Found alternative supplier with better terms')">
+                            Alternative found
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'inventory:purchase_order_detail' order.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Go Back
+                    </a>
+                    
+                    <button type="submit" class="btn btn-danger btn-lg">
+                        <i class="fas fa-ban me-2"></i>Cancel Purchase Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function setReason(text) {
+    document.getElementById('reason').value = text;
+}
+
+document.getElementById('cancelForm').addEventListener('submit', function(e) {
+    const reason = document.getElementById('reason').value.trim();
+    
+    if (!reason) {
+        e.preventDefault();
+        alert('Please provide a reason for cancellation.');
+        return false;
+    }
+    
+    if (!confirm('⚠️ FINAL CONFIRMATION ⚠️\n\nAre you absolutely sure you want to CANCEL this purchase order?\n\nOrder: {{ order.order_no }}\nSupplier: {{ order.supplier.name }}\nTotal: ₱{{ order.total_amount|floatformat:2 }}\n\nThis action CANNOT be undone!')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

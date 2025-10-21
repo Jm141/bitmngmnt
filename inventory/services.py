@@ -493,20 +493,47 @@ class PurchaseOrderService:
     
     @staticmethod
     @transaction.atomic
-    def approve_purchase_order(po, supplier_notes=None, expected_delivery_date=None):
+    def supplier_approve_purchase_order(po, user, supplier_notes=None, expected_delivery_date=None):
         """
-        Approve purchase order (supplier action)
+        Supplier approves purchase order with pricing
         """
-        po.approve_order(supplier_notes=supplier_notes, expected_delivery_date=expected_delivery_date)
+        po.supplier_approve_order(user=user, supplier_notes=supplier_notes, expected_delivery_date=expected_delivery_date)
         return po
     
     @staticmethod
     @transaction.atomic
-    def ship_purchase_order(po):
+    def admin_approve_purchase_order(po, user, admin_notes=None):
+        """
+        Admin approves purchase order after reviewing pricing
+        """
+        po.admin_approve_order(user=user, admin_notes=admin_notes)
+        return po
+    
+    @staticmethod
+    @transaction.atomic
+    def admin_reject_purchase_order(po, user, reason):
+        """
+        Admin rejects purchase order (price too high, etc.)
+        """
+        po.admin_reject_order(user=user, reason=reason)
+        return po
+    
+    @staticmethod
+    @transaction.atomic
+    def cancel_purchase_order(po, user, reason):
+        """
+        Cancel purchase order with reason
+        """
+        po.cancel_order(user=user, reason=reason)
+        return po
+    
+    @staticmethod
+    @transaction.atomic
+    def ship_purchase_order(po, user=None):
         """
         Mark purchase order as shipped
         """
-        po.mark_shipped()
+        po.mark_shipped(user=user)
         return po
     
     @staticmethod
