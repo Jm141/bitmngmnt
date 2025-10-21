@@ -1175,13 +1175,17 @@
                         {% endif %}
                         
                         {% if user|has_perm:'inventory_read' %}
-                        <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
-                            <i class="fas fa-truck nav-icon"></i>
-                            <span>Suppliers</span>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'production_list' %}active{% endif %}" href="{% url 'inventory:production_list' %}">
+                            <i class="fas fa-industry nav-icon"></i>
+                            <span>Production</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'recipe_list' or request.resolver_match.url_name == 'recipe_detail' %}active{% endif %}" href="{% url 'inventory:recipe_list' %}">
                             <i class="fas fa-book nav-icon"></i>
                             <span>Recipes</span>
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
+                            <i class="fas fa-truck nav-icon"></i>
+                            <span>Suppliers</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'expiration_tracker' %}active{% endif %}" href="{% url 'inventory:expiration_tracker' %}">
                             <i class="fas fa-calendar-times nav-icon"></i>
@@ -1218,6 +1222,10 @@
                         <a class="nav-item {% if 'purchase_order' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:purchase_order_list' %}">
                             <i class="fas fa-shopping-cart nav-icon"></i>
                             <span>Purchase Orders</span>
+                        </a>
+                        <a class="nav-item {% if request.resolver_match.url_name == 'production_list' or request.resolver_match.url_name == 'production_create' %}active{% endif %}" href="{% url 'inventory:production_list' %}">
+                            <i class="fas fa-industry nav-icon"></i>
+                            <span>Production</span>
                         </a>
                         <a class="nav-item {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' %}active{% endif %}" href="{% url 'inventory:supplier_list' %}">
                             <i class="fas fa-truck nav-icon"></i>

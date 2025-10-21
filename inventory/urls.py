@@ -47,7 +47,10 @@ urlpatterns = [
     path('stock/consume/', views.stock_consume, name='stock_consume'),
     path('api/item-lots/', views.api_item_lots, name='api_item_lots'),
     path('api/item-meta/', views.api_item_meta, name='api_item_meta'),
+    
+    # Production
     path('production/', views.production_create, name='production_create'),
+    path('production/list/', views.production_list, name='production_list'),
     
     # Suppliers
     path('suppliers/', views.supplier_list, name='supplier_list'),

@@ -1,0 +1,275 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Production Records - {{ block.super }}{% endblock %}
+{% block page_title %}Production Records{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-industry me-2"></i>Production Records</h2>
+            <p class="text-muted">Track and manage all production activities</p>
+        </div>
+        <div class="col-auto">
+            {% if perms.inventory_write %}
+            <a href="{% url 'inventory:production_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Production
+            </a>
+            {% endif %}
+            <button onclick="window.print()" class="btn btn-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+        </div>
+    </div>
+
+    <!-- Today's Production Summary -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Today's Production - {{ today|date:"F d, Y" }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-primary mb-0">{{ today_total_items }}</h3>
+                                <p class="text-muted mb-0">Production Batches</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-success mb-0">{{ today_total_qty|floatformat:0 }}</h3>
+                                <p class="text-muted mb-0">Total Units Produced</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            {% if today_productions %}
+                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Product</th>
+                                            <th>Quantity</th>
+                                            <th>Ingredients</th>
+                                            <th>By</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for prod in today_productions %}
+                                        <tr>
+                                            <td>{{ prod.timestamp|date:"h:i A" }}</td>
+                                            <td>{{ prod.item.name }}</td>
+                                            <td>{{ prod.qty }} {{ prod.get_unit_display }}</td>
+                                            <td>
+                                                {% if prod.ingredients_used %}
+                                                <button class="btn btn-sm btn-outline-info btn-xs" type="button" data-bs-toggle="collapse" data-bs-target="#ing-summary-{{ prod.id }}">
+                                                    <i class="fas fa-eye"></i> {{ prod.ingredients_used|length }}
+                                                </button>
+                                                <div class="collapse mt-1" id="ing-summary-{{ prod.id }}">
+                                                    <small>
+                                                        {% for ing in prod.ingredients_used %}
+                                                        <div>{{ ing.ingredient.name }}: <strong>{{ ing.qty|floatformat:2 }} {{ ing.unit }}</strong></div>
+                                                        {% endfor %}
+                                                    </small>
+                                                </div>
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ prod.created_by.get_full_name|default:prod.created_by.username }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>No production recorded today yet.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" name="date" class="form-control" value="{{ date_filter }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Product</label>
+                            <input type="text" name="recipe" class="form-control" placeholder="Search product..." value="{{ recipe_filter }}">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="fas fa-filter me-2"></i>Filter
+                            </button>
+                            <a href="{% url 'inventory:production_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Clear
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Records Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">All Production Records</h5>
+                </div>
+                <div class="card-body">
+                    {% if productions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="productionTable">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Product</th>
+                                    <th>Lot Number</th>
+                                    <th>Quantity</th>
+                                    <th>Ingredients Used</th>
+                                    <th>Unit Cost</th>
+                                    <th>Total Value</th>
+                                    <th>Produced By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for production in productions %}
+                                <tr>
+                                    <td>
+                                        <div>{{ production.timestamp|date:"M d, Y" }}</div>
+                                        <small class="text-muted">{{ production.timestamp|date:"h:i A" }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ production.item.name }}</strong><br>
+                                        <small class="text-muted">{{ production.item.code }}</small>
+                                    </td>
+                                    <td>
+                                        {% if production.lot %}
+                                        <span class="badge bg-info">{{ production.lot.lot_no }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ production.qty }}</strong> {{ production.get_unit_display }}
+                                    </td>
+                                    <td>
+                                        {% if production.ingredients_used %}
+                                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#ingredients-{{ production.id }}" aria-expanded="false">
+                                            <i class="fas fa-list me-1"></i>View ({{ production.ingredients_used|length }})
+                                        </button>
+                                        <div class="collapse mt-2" id="ingredients-{{ production.id }}">
+                                            <div class="card card-body p-2">
+                                                <small>
+                                                    {% for ing in production.ingredients_used %}
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span class="text-muted">{{ ing.ingredient.name }}:</span>
+                                                        <strong>{{ ing.qty|floatformat:2 }} {{ ing.unit }}</strong>
+                                                    </div>
+                                                    {% endfor %}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">No recipe</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if production.lot and production.lot.unit_cost %}
+                                        ₱{{ production.lot.unit_cost|floatformat:2 }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if production.lot and production.lot.unit_cost %}
+                                        <strong>₱{{ production.qty|mul:production.lot.unit_cost|floatformat:2 }}</strong>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div>{{ production.created_by.get_full_name|default:production.created_by.username }}</div>
+                                        <small class="text-muted">{{ production.created_by.get_role_display }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary">
+                                    <td colspan="3"><strong>Total</strong></td>
+                                    <td><strong>{{ productions.paginator.count }} records</strong></td>
+                                    <td colspan="4"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if productions.has_other_pages %}
+                    <nav aria-label="Page navigation" class="mt-3">
+                        <ul class="pagination justify-content-center">
+                            {% if productions.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ productions.previous_page_number }}{% if date_filter %}&date={{ date_filter }}{% endif %}{% if recipe_filter %}&recipe={{ recipe_filter }}{% endif %}">Previous</a>
+                            </li>
+                            {% endif %}
+                            
+                            <li class="page-item active">
+                                <span class="page-link">Page {{ productions.number }} of {{ productions.paginator.num_pages }}</span>
+                            </li>
+                            
+                            {% if productions.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ productions.next_page_number }}{% if date_filter %}&date={{ date_filter }}{% endif %}{% if recipe_filter %}&recipe={{ recipe_filter }}{% endif %}">Next</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No production records found. 
+                        {% if perms.inventory_write %}
+                        <a href="{% url 'inventory:production_create' %}">Create your first production</a>.
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        .btn, .card-header, nav, form, .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        table {
+            font-size: 12px;
+        }
+    }
+</style>
+{% endblock %}

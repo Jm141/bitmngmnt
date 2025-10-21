@@ -209,7 +209,7 @@ class InventoryService:
         # Check if all ingredients are available
         for ingredient_data in required_ingredients:
             ingredient = ingredient_data['ingredient']
-            qty_needed = ingredient_data['qty']
+            qty_needed = Decimal(str(ingredient_data['qty']))
             
             available_stock = sum(lot.qty for lot in InventoryService.get_available_lots(ingredient))
             if available_stock < qty_needed:
@@ -218,7 +218,7 @@ class InventoryService:
         # Consume ingredients
         for ingredient_data in required_ingredients:
             ingredient = ingredient_data['ingredient']
-            qty_needed = ingredient_data['qty']
+            qty_needed = Decimal(str(ingredient_data['qty']))
             
             InventoryService.consume_stock(
                 item=ingredient,

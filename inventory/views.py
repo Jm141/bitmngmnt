@@ -309,6 +309,15 @@ def attendance_dashboard(request):
         next_month, next_year = 1, year + 1
     else:
         next_month, next_year = month + 1, year
+    
+    # Get today's production for staff dashboard
+    today_productions = StockMovement.objects.filter(
+        movement_type='produce',
+        timestamp__date=today
+    ).select_related('item', 'lot', 'created_by').order_by('-timestamp')
+    
+    today_total_items = today_productions.count()
+    today_total_qty = sum(p.qty for p in today_productions)
 
     context = {
         'target_user': target_user,
@@ -323,6 +332,10 @@ def attendance_dashboard(request):
         'next_month': next_month,
         'next_year': next_year,
         'records_dict': records_dict,
+        'today_productions': today_productions,
+        'today_total_items': today_total_items,
+        'today_total_qty': today_total_qty,
+        'today': today,
     }
     return render(request, 'inventory/attendance_dashboard.html', context)
 
@@ -1388,6 +1401,111 @@ def production_create(request):
     }
     
     return render(request, 'inventory/production_form.html', context)
+
+
+@login_required
+@permission_required('inventory_read')
+def production_list(request):
+    """
+    List all production records with filtering
+    """
+    from datetime import datetime, timedelta
+    
+    # Get filter parameters
+    date_filter = request.GET.get('date', '')
+    recipe_filter = request.GET.get('recipe', '')
+    
+    # Get production records (StockMovements with type='produce')
+    productions = StockMovement.objects.filter(
+        movement_type='produce'
+    ).select_related('item', 'lot', 'created_by').order_by('-timestamp')
+    
+    # Apply date filter
+    if date_filter:
+        try:
+            filter_date = datetime.strptime(date_filter, '%Y-%m-%d').date()
+            productions = productions.filter(timestamp__date=filter_date)
+        except ValueError:
+            pass
+    
+    # Apply recipe filter
+    if recipe_filter:
+        productions = productions.filter(item__name__icontains=recipe_filter)
+    
+    # Get today's production for quick view
+    today = timezone.now().date()
+    today_productions = StockMovement.objects.filter(
+        movement_type='produce',
+        timestamp__date=today
+    ).select_related('item', 'lot', 'created_by').order_by('-timestamp')
+    
+    # Calculate today's summary
+    today_total_items = today_productions.count()
+    today_total_qty = sum(p.qty for p in today_productions)
+    
+    # Pagination
+    paginator = Paginator(productions, 20)
+    page_number = request.GET.get('page')
+    productions = paginator.get_page(page_number)
+    
+    # Calculate ingredients used for each production
+    for production in productions:
+        # Find the recipe for this product (get the first active one if multiple exist)
+        try:
+            recipe = Recipe.objects.filter(product=production.item, is_active=True).first()
+            if recipe:
+                # Calculate ingredients needed based on production quantity
+                ingredients_used = []
+                for recipe_item in recipe.recipe_items.all():
+                    qty_needed = float(recipe_item.qty) * float(production.qty) / float(recipe.yield_qty)
+                    # Apply loss factor if any
+                    qty_needed = qty_needed * recipe_item.get_adjusted_qty() / float(recipe_item.qty)
+                    ingredients_used.append({
+                        'ingredient': recipe_item.ingredient,
+                        'qty': qty_needed,
+                        'unit': recipe_item.unit
+                    })
+                production.ingredients_used = ingredients_used
+            else:
+                production.ingredients_used = []
+        except Exception:
+            production.ingredients_used = []
+    
+    # Calculate ingredients for today's productions
+    for production in today_productions:
+        try:
+            recipe = Recipe.objects.filter(product=production.item, is_active=True).first()
+            if recipe:
+                ingredients_used = []
+                for recipe_item in recipe.recipe_items.all():
+                    qty_needed = float(recipe_item.qty) * float(production.qty) / float(recipe.yield_qty)
+                    qty_needed = qty_needed * recipe_item.get_adjusted_qty() / float(recipe_item.qty)
+                    ingredients_used.append({
+                        'ingredient': recipe_item.ingredient,
+                        'qty': qty_needed,
+                        'unit': recipe_item.unit
+                    })
+                production.ingredients_used = ingredients_used
+            else:
+                production.ingredients_used = []
+        except Exception:
+            production.ingredients_used = []
+    
+    # Get all recipes for filter dropdown
+    recipes = Recipe.objects.filter(is_active=True).values_list('product__name', flat=True).distinct()
+    
+    context = {
+        'productions': productions,
+        'today_productions': today_productions,
+        'today_total_items': today_total_items,
+        'today_total_qty': today_total_qty,
+        'date_filter': date_filter,
+        'recipe_filter': recipe_filter,
+        'recipes': recipes,
+        'today': today,
+    }
+    
+    return render(request, 'inventory/production_list.html', context)
 
 
 @login_required
